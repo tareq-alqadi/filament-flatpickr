@@ -62,14 +62,13 @@ export default function flatpickrDatepicker(args) {
 
                 onChange: (selectedDates, dateStr, instance) => {
                     const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
-                    console.log(formattedDates);
                     this.setState(formattedDates.join(', '));
                 },
-                onReady: (selectedDates, dateStr, instance) => {
-                    const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
-                    console.log(formattedDates);
-                    this.setState(formattedDates.join(', '));
-                },
+                // onReady: (selectedDates, dateStr, instance) => {
+                //     const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
+                //     console.log(formattedDates);
+                //     this.setState(formattedDates.join(', '));
+                // },
             };
             if (this.getMode === "dark") {
                 let el = document.querySelector("#pickr-theme");
@@ -94,6 +93,9 @@ export default function flatpickrDatepicker(args) {
             }*/
             this.fp = flatpickr(this.$refs.picker, config);
             this.fp.parseDate(this.state, this.packageConfig.dateFormat);
+
+            const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
+            this.setState(formattedDates.join(', '));
 
             window.addEventListener("theme-changed", (e) => {
                 this.mode = e.detail.dark ? "dark" : "light";
