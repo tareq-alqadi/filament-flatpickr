@@ -92,10 +92,8 @@ export default function flatpickrDatepicker(args) {
                 config.plugins.push(new RangePlugin({}))
             }*/
             this.fp = flatpickr(this.$refs.picker, config);
-            this.fp.parseDate(this.state, this.packageConfig.dateFormat);
-
-            const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
-            this.setState(formattedDates.join(', '));
+            date = this.fp.parseDate(this.state, this.packageConfig.dateFormat);
+            this.setState(date);
 
             window.addEventListener("theme-changed", (e) => {
                 this.mode = e.detail.dark ? "dark" : "light";
