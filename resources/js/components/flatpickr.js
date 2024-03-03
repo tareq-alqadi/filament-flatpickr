@@ -34,9 +34,9 @@ export default function flatpickrDatepicker(args) {
         setState: function (value) {
             this.state = value;
 
-            // if(this.fp){
-            //     this.fp.setDate(Date.parse(value),this.packageConfig.dateFormat);
-            // }
+            if(this.fp){
+                this.fp.setDate(Date.parse(value));
+            }
         },
 
         init: function () {
@@ -61,9 +61,7 @@ export default function flatpickrDatepicker(args) {
                 ],
 
                 onChange: (selectedDates, dateStr, instance) => {
-
                     const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
-                    console.log(formattedDates.join(', '));
                     this.setState(formattedDates.join(', '));
                 },
             };
