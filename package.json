@@ -1,0 +1,11 @@
+{
+    "type": "module",
+    "devDependencies": {
+        "esbuild": "^0.18.17",
+        "flatpickr": "^4.6.13"
+    },
+    "dependencies": {
+        "date-fns": "^3.3.1",
+        "moment": "^2.30.1"
+    }
+}

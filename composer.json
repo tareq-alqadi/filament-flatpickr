@@ -1,0 +1,30 @@
+{
+    "name": "tareq-alqadi/filament-flatpickr",
+    "description": "Integrate Flatpickr with FilamentPHP",
+    "type": "library",
+    "version": "3.0.15",
+    "license": "proprietary",
+    "autoload": {
+        "psr-4": {
+            "TareqAlqadi\\FilamentFlatpickr\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Tareq Al-Qadi",
+            "email": "alqadi.tareq199@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TareqAlqadi\\FilamentFlatpickr\\FilamentFlatpickrServiceProvider"
+            ],
+            "aliases": {
+                "FilamentFlatpickr": "TareqAlqadi\\FilamentFlatpickr\\Facades\\FilamentFlatpickr"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "require": {}
+}
