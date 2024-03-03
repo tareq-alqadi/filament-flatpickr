@@ -3,7 +3,7 @@
     "description": "Integrate Flatpickr with FilamentPHP",
     "type": "library",
     "version": "3.0.15",
-    "license": "proprietary",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "TareqAlqadi\\FilamentFlatpickr\\": "src/"
@@ -26,5 +26,5 @@
         }
     },
     "minimum-stability": "stable",
-    "require": {}
+    "prefer-stable": true
 }
