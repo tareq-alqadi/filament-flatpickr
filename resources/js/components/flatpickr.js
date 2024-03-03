@@ -65,6 +65,11 @@ export default function flatpickrDatepicker(args) {
                     console.log(formattedDates);
                     this.setState(formattedDates.join(', '));
                 },
+                onReady: (selectedDates, dateStr, instance) => {
+                    const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
+                    console.log(formattedDates);
+                    this.setState(formattedDates.join(', '));
+                },
             };
             if (this.getMode === "dark") {
                 let el = document.querySelector("#pickr-theme");
