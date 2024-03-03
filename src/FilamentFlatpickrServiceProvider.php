@@ -28,6 +28,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
 
     public function packageBooted()
     {
+        
         FilamentAsset::register([
             Js::make('flatpickr-range-plugin', __DIR__.'/../resources/assets/flatpickr/dist/plugins/rangePlugin.js')->loadedOnRequest(),
             Js::make('flatpickr-confirm-date', __DIR__.'/../resources/assets/flatpickr/dist/plugins/confirmDate/confirmDate.js')->loadedOnRequest(),
