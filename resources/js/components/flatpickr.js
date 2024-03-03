@@ -61,9 +61,8 @@ export default function flatpickrDatepicker(args) {
                 ],
 
                 onChange: (selectedDates, dateStr, instance) => {
-                    const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
 
-                    const formattedDates = selectedDates.map(date => format(date, 'dd/MM/yyyy'));
+                    const formattedDates = selectedDates.map(date => format(date, 'MM/dd/yyyy'));
                     
                     this.setState(formattedDates.join(', '));
                 },
