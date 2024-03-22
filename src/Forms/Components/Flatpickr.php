@@ -29,7 +29,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
 
     const PACKAGE_NAME = 'tareq-alqadi/filament-flatpickr';
 
-    protected string $view = 'tareq-alqadi-flatpickr::forms.components.flatpickr';
+    protected string $view = 'tareq-alqadi-filament-flatpickr::forms.components.flatpickr';
 
     protected bool $monthSelect = false;
 
