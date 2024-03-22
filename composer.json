@@ -1,30 +1,37 @@
 {
-    "name": "tareq-alqadi/filament-flatpickr",
-    "description": "Integrate Flatpickr with FilamentPHP",
-    "type": "library",
-    "version": "3.0.24",
-    "license": "MIT",
-    "autoload": {
-        "psr-4": {
-            "TareqAlqadi\\FilamentFlatpickr\\": "src/"
-        }
-    },
-    "authors": [
-        {
-            "name": "Tareq Al-Qadi",
-            "email": "alqadi.tareq199@gmail.com"
-        }
-    ],
-    "extra": {
-        "laravel": {
-            "providers": [
-                "TareqAlqadi\\FilamentFlatpickr\\FilamentFlatpickrServiceProvider"
-            ],
-            "aliases": {
-                "FilamentFlatpickr": "TareqAlqadi\\FilamentFlatpickr\\Facades\\FilamentFlatpickr"
-            }
-        }
-    },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+  "name": "tareq-alqadi/filament-flatpickr",
+  "description": "Integrate Flatpickr with FilamentPHP",
+  "type": "library",
+  "version": "3.1.9",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "TareqAlqadi\\FilamentFlatpickr\\": "src/"
+    }
+  },
+  "require": {
+    "php": "^8.1",
+    "filament/filament": "^3.0",
+    "spatie/laravel-package-tools": "^1.15.0",
+    "illuminate/contracts": "^10.0"
+  },
+  "authors": [
+    {
+      "name": "Tareq Al-Qadi",
+      "email": "alqadi.tareq199@gmail.com",
+      "role": "Developer"
+    }
+  ],
+  "extra": {
+    "laravel": {
+      "providers": [
+        "TareqAlqadi\\FilamentFlatpickr\\FilamentFlatpickrServiceProvider"
+      ],
+      "aliases": {
+        "FilamentFlatpickr": "TareqAlqadi\\FilamentFlatpickr\\Facades\\FilamentFlatpickr"
+      }
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
 }

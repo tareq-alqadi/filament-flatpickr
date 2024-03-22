@@ -2,13 +2,13 @@
 
 namespace TareqAlqadi\FilamentFlatpickr;
 
-use TareqAlqadi\FilamentFlatpickr\Commands\FilamentFlatpickrCommand;
 use Filament\Support\Assets\AlpineComponent;
 use Filament\Support\Assets\Css;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use TareqAlqadi\FilamentFlatpickr\Commands\FilamentFlatpickrCommand;
 
 class FilamentFlatpickrServiceProvider extends PackageServiceProvider
 {
@@ -20,7 +20,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('tareq-alqadi-flatpickr')
+            ->name('tareq-alqadi-filament-flatpickr')
             ->hasConfigFile()
             ->hasViews()
             ->hasCommand(FilamentFlatpickrCommand::class);
@@ -28,7 +28,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
 
     public function packageBooted()
     {
-        
+
         FilamentAsset::register([
             Js::make('flatpickr-range-plugin', __DIR__.'/../resources/assets/flatpickr/dist/plugins/rangePlugin.js')->loadedOnRequest(),
             Js::make('flatpickr-confirm-date', __DIR__.'/../resources/assets/flatpickr/dist/plugins/confirmDate/confirmDate.js')->loadedOnRequest(),

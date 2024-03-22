@@ -4,8 +4,8 @@ namespace TareqAlqadi\FilamentFlatpickr;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
 use Illuminate\Support\Str;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
 
 class FilamentFlatpickr
 {

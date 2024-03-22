@@ -1,5 +1,12 @@
 {
     "type": "module",
+    "scripts": {
+        "dev:scripts": "node bin/build.js --dev",
+        "build:scripts": "node bin/build.js",
+        "dev": "npm-run-all --parallel dev:*",
+        "build": "npm-run-all build:*"
+    },
+
     "devDependencies": {
         "esbuild": "^0.18.17",
         "flatpickr": "^4.6.13"

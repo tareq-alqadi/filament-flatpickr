@@ -4,14 +4,14 @@ namespace TareqAlqadi\FilamentFlatpickr\Forms\Components;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
-use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
-use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
-use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 use Filament\Forms\Components\Concerns;
 use Filament\Forms\Components\Contracts;
 use Filament\Forms\Components\Field;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 
 class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contracts\HasAffixActions
 {
@@ -25,7 +25,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
     use Concerns\HasPlaceholder;
     use HasExtraAlpineAttributes;
 
-    const PACKAGE_NAME = 'tareq-alqadi/flatpickr';
+    const PACKAGE_NAME = 'tareq-alqadi/filament-flatpickr';
 
     protected string $view = 'tareq-alqadi-flatpickr::forms.components.flatpickr';
 
@@ -121,11 +121,6 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
 
     public function getConfig(): array
     {
-        if ($this->isRangePicker()) {
-            $this->mode(FlatpickrMode::RANGE);
-        } elseif ($this->isMultiplePicker()) {
-            $this->mode(FlatpickrMode::MULTIPLE);
-        }
         if ($this->isEnableTime()) {
             if (! \Str::of($this->getDateFormat())->contains('H', ignoreCase: true)) {
                 $this->dateFormat('Y-m-d H:i:s');
@@ -134,7 +129,11 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
                 $this->altFormat('F j Y H:i K');
             }
         }
-        if ($this->isTime()) {
+        if ($this->isRangePicker()) {
+            $this->mode(FlatpickrMode::RANGE);
+        } elseif ($this->isMultiplePicker()) {
+            $this->mode(FlatpickrMode::MULTIPLE);
+        } elseif ($this->isTime()) {
             $this->mode(FlatpickrMode::TIME);
             $this->noCalendar();
             $this->enableTime();
@@ -158,6 +157,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
             $this->altFormat('\Week W');
             $this->altInput();
         }
+
         $config = [
             'monthSelect' => $this->monthSelect,
             'weekSelect' => $this->weekSelect,
