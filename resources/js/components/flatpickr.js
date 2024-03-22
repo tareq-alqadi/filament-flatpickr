@@ -123,6 +123,8 @@ export default function flatpickrDatepicker(args) {
             this.setState(formattedDate);
           }
 
+          console.log(this.state);
+
         }
       });
 
