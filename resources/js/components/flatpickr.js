@@ -103,6 +103,7 @@ export default function flatpickrDatepicker(args) {
       this.setFlatpickrDate(this.state);
 
       this.$refs.picker.addEventListener("change", (e) => {
+        console.log('test');
         if (this.fp) {
 
           if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
