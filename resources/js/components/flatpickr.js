@@ -59,22 +59,22 @@ export default function flatpickrDatepicker(args) {
           }),
         ],
 
-        // onChange: (selectedDates, dateStr, instance) => {
-        //   if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
-        //     const formattedDates = selectedDates.map((date) => {
-        //       return flatpickr.formatDate(
-        //         new Date(date),
-        //         this.packageConfig.dateFormat
-        //       );
-        //     });
-        //     this.setState(formattedDates);
-        //   } else {
-        //     this.setState(dateStr);
-        //   }
-        // },
-        // onClose(selectedDates, dateStr, instance) {
-        //   instance.setDate(selectedDates, true)
-        // }
+        onChange: (selectedDates, dateStr, instance) => {
+          if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
+            const formattedDates = selectedDates.map((date) => {
+              return flatpickr.formatDate(
+                new Date(date),
+                this.packageConfig.dateFormat
+              );
+            });
+            this.setState(formattedDates);
+          } else {
+            this.setState(dateStr);
+          }
+        },
+        onClose(selectedDates, dateStr, instance) {
+          instance.setDate(selectedDates, true)
+        }
 
       };
       if (this.getMode === "dark") {
@@ -102,31 +102,31 @@ export default function flatpickrDatepicker(args) {
       this.fp = flatpickr(this.$refs.picker, config);
       this.setFlatpickrDate(this.state);
 
-      this.$refs.picker.addEventListener("change", (e) => {
-        console.log('test');
-        if (this.fp) {
+      // this.$refs.picker.addEventListener("change", (e) => {
+      //   console.log('test');
+      //   if (this.fp) {
 
-          if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
-            const formattedDates = this.fp.selectedDates.map((date) => {
-              return flatpickr.formatDate(
-                new Date(date),
-                this.packageConfig.dateFormat
-              );
-            });
-            this.setState(formattedDates);
-          } else {
-            const formattedDate = flatpickr.formatDate(
-              new Date(this.fp.selectedDates[0]),
-              this.packageConfig.dateFormat
-            );
+      //     if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
+      //       const formattedDates = this.fp.selectedDates.map((date) => {
+      //         return flatpickr.formatDate(
+      //           new Date(date),
+      //           this.packageConfig.dateFormat
+      //         );
+      //       });
+      //       this.setState(formattedDates);
+      //     } else {
+      //       const formattedDate = flatpickr.formatDate(
+      //         new Date(this.fp.selectedDates[0]),
+      //         this.packageConfig.dateFormat
+      //       );
 
-            this.setState(formattedDate);
-          }
+      //       this.setState(formattedDate);
+      //     }
 
-          console.log(this.state);
+      //     console.log(this.state);
 
-        }
-      });
+      //   }
+      // });
 
       window.addEventListener("theme-changed", (e) => {
         this.mode = e.detail.dark ? "dark" : "light";
