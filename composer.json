@@ -2,7 +2,7 @@
   "name": "tareq-alqadi/filament-flatpickr",
   "description": "Integrate Flatpickr with FilamentPHP",
   "type": "library",
-  "version": "3.1.9",
+  "version": "3.1.10",
   "license": "MIT",
   "autoload": {
     "psr-4": {
