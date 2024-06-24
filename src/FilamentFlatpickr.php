@@ -2,8 +2,8 @@
 
 namespace TareqAlqadi\FilamentFlatpickr;
 
-use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
 
