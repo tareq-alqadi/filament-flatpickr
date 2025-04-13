@@ -4,6 +4,7 @@ namespace TareqAlqadi\FilamentFlatpickr\Forms\Components;
 
 use Carbon\CarbonInterface;
 use Carbon\Exceptions\InvalidFormatException;
+use Closure;
 use Filament\Forms\Components\Concerns;
 use Filament\Forms\Components\Contracts;
 use Filament\Forms\Components\Field;
@@ -86,6 +87,8 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
     protected int $minuteIncrement = 5;
 
     protected bool $inline = false;
+
+    protected string | Closure | null $timezone = null;
 
     protected Carbon|string|null $maxDate = null;
 
@@ -242,17 +245,20 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
 
             if (!$state instanceof CarbonInterface) {
                 try {
-                    $state = Carbon::createFromFormat($component->getDateFormat(), $state)->setTimezone(config('app.timezone'));
+                    $state = Carbon::createFromFormat($component->getDateFormat(), (string) $state, config('app.timezone'));
                 } catch (InvalidFormatException $exception) {
                     try {
-                        $state = Carbon::parse($state)->setTimezone(config('app.timezone'));
+                        $state = Carbon::parse($state, config('app.timezone'));
                     } catch (InvalidFormatException $exception) {
                         $component->state(null);
 
                         return;
                     }
                 }
+
+                $state = $state->setTimezone($component->getTimezone());
             }
+
             $component->getConfig();
 
             $component->state($state->format($component->getDateFormat()));
@@ -278,35 +284,48 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
                     $state = Carbon::createFromFormat($component->getDateFormat(), $state)->setDay(1);
                 } catch (InvalidFormatException $exception) {
                     try {
-                        $state = Carbon::parse($state)->setDay(1)->setTimezone(config('app.timezone'));
+                        $state = Carbon::parse($state)->setDay(1);
                     } catch (InvalidFormatException $exception) {
                         $component->state(null);
 
                         return;
                     }
                 }
+
+                $state->shiftTimezone($component->getTimezone());
+                $state->setTimezone(config('app.timezone'));
             } elseif ($component->getMode() === FlatpickrMode::TIME->value) {
             } elseif ($component->getMode() === FlatpickrMode::SINGLE->value) {
                 try {
                     $state = Carbon::createFromFormat($component->getDateFormat(), $state);
                 } catch (InvalidFormatException $exception) {
                     try {
-                        $state = Carbon::parse($state)->setTimezone(config('app.timezone'));
+                        $state = Carbon::parse($state);
                     } catch (InvalidFormatException $exception) {
                         $component->state(null);
 
                         return;
                     }
                 }
+
+                $state->shiftTimezone($component->getTimezone());
+                $state->setTimezone(config('app.timezone'));
             } elseif ($component->getMode() === FlatpickrMode::RANGE->value) {
 
-                $state = collect($state)->map(fn ($date) => Carbon::createFromFormat($component->getDateFormat(), $date)
-                    ->setTimezone(config('app.timezone')))
+                $state = collect($state)
+                    ->map(static function ($date) use ($component) {
+                        return Carbon::createFromFormat($component->getDateFormat(), $date)
+                            ->shiftTimezone($component->getTimezone())
+                            ->setTimezone(config('app.timezone'));
+                    })
                     ->toArray();
             } elseif ($component->getMode() === FlatpickrMode::MULTIPLE->value) {
 
-                $state = collect($state)->map(fn ($date) => Carbon::createFromFormat($component->getDateFormat(), $date)
-                    ->setTimezone(config('app.timezone')))
+                $state = collect($state)->map(function ($date) use ($component) {
+                    return Carbon::createFromFormat($component->getDateFormat(), $date)
+                        ->shiftTimezone($component->getTimezone())
+                        ->setTimezone(config('app.timezone'));
+                })
                     ->toArray();
             }
         }
@@ -515,6 +534,20 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
 
         return $this;
     }
+
+    public function timezone(string | Closure | null $timezone): static
+    {
+        $this->timezone = $timezone;
+
+        return $this;
+    }
+
+
+    public function getTimezone(): string
+    {
+        return $this->evaluate($this->timezone) ?? config('app.timezone');
+    }
+
 
     public function getMaxDate(): Carbon|string|null
     {
