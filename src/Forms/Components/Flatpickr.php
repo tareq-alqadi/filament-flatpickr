@@ -238,6 +238,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contr
             return static::dehydratePickerState($component, $state);
         });
 
+        $this->mutateStateForValidationUsing(static function (Flatpickr $component, $state) {
+            return static::dehydratePickerState($component, $state);
+        });
+
         $this->afterStateHydrated(static function (Flatpickr $component, $state): void {
             if (blank($state)) {
                 return;
