@@ -16,7 +16,7 @@ use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 
-class Flatpickr extends Field implements Contracts\CanBeLengthConstrained, Contracts\HasAffixActions
+class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 {
     use Concerns\CanBeAutocapitalized;
     use Concerns\CanBeAutocompleted;
