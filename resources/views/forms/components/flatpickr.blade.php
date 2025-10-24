@@ -36,16 +36,18 @@
         attribs: @js($attribs),
         locale: '{{ config('app.locale') }}'
     })" wire:ignore x-ignore
-        @if (FilamentView::hasSpaMode()) ax-load="visible"
+        @if (FilamentView::hasSpaMode())
+            x-load="visible"
         @else
-            ax-load @endif
+            x-load
+        @endif
         x-load-css="[
             @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-css', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
             @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('month-select-style', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
             @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-confirm-date-style', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
             {{-- @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-'.$attribs['theme'].'-theme', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())) --}}
         ]"
-        ax-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('flatpickr-component', package: \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName()) }}">
+        x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('flatpickr-component', package: \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName()) }}">
         <x-filament::input.wrapper :disabled="$isDisabled" :inline-prefix="$isPrefixInline" :inline-suffix="$isSuffixInline" :prefix="$prefixLabel"
             :prefix-actions="$prefixActions" :prefix-icon="$prefixIcon" :suffix="$suffixLabel" :suffix-actions="$suffixActions" :suffix-icon="$suffixIcon"
             :valid="!$errors->has($statePath)" class="fi-fo-text-input" :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class([
