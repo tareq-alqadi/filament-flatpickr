@@ -1,47 +1,183 @@
 import flatpickr from "flatpickr";
-import ConfirmDate from "flatpickr/dist/esm/plugins/confirmDate/confirmDate";
 import MonthSelect from "flatpickr/dist/esm/plugins/monthSelect";
 import WeekSelect from "flatpickr/dist/esm/plugins/weekSelect/weekSelect";
 import "flatpickr/dist/l10n/ar";
 
-// import RangePlugin from "../../assets/flatpickr/dist/esm/plugins/rangePlugin.js";
 export default function flatpickrDatepicker(args) {
   return {
+    // Reactive state
     state: args.state,
-    date: null,
     mode: "light",
     locale: args.locale ?? "en",
     attribs: args.attribs ?? {},
     packageConfig: args.packageConfig ?? {},
+    
+    // Internal state
     fp: null,
+
+    // Computed properties
     get darkStatus() {
-      return document.querySelector("html").classList.contains("dark");
-      //window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return document.querySelector("html")?.classList.contains("dark") ?? false;
     },
-    get getMode() {
-      if (localStorage.getItem("theme")) {
-        return localStorage.getItem("theme");
+
+    get themeMode() {
+      const storedTheme = localStorage.getItem("theme");
+      if (storedTheme) {
+        return storedTheme;
       }
       this.mode = this.darkStatus ? "dark" : "light";
       return this.mode;
     },
-    get darkLightAssetUrl() {
+
+    get themeAssetUrl() {
       return this.darkStatus
         ? this.attribs.darkThemeAsset
         : this.attribs.lightThemeAsset;
     },
 
-    setState: function (value) {
-      this.state = value;
+    get isMonthSelect() {
+      return this.attribs.monthSelect === true;
     },
-    setFlatpickrDate: function (value) {
+
+    get isWeekSelect() {
+      return this.attribs.weekSelect === true;
+    },
+
+    get isRangePicker() {
+      return this.attribs.rangePicker === true;
+    },
+
+    get isMultipleMode() {
+      return this.attribs.mode === "multiple";
+    },
+
+    /**
+     * Parse a date string for month select format (Y-m)
+     * @param {string} dateValue - Date string in Y-m format
+     * @returns {Date|null} Parsed date or null
+     */
+    parseMonthSelectDate(dateValue) {
+      if (!dateValue) return null;
+      
+      // Try parsing with flatpickr's parseDate
       if (this.fp) {
+        const parsed = this.fp.parseDate(dateValue, this.packageConfig.dateFormat);
+        if (parsed) return parsed;
+      }
+      
+      // Fallback: manually parse Y-m format by appending day
+      if (this.packageConfig.dateFormat === 'Y-m') {
+        return new Date(`${dateValue}-01T00:00:00Z`);
+      }
+      
+      return null;
+    },
+
+    /**
+     * Set the date in flatpickr instance
+     * @param {string|Date|null} value - Date value to set
+     */
+    setFlatpickrDate(value) {
+      if (!this.fp) return;
+      
+      if (!value) {
+        this.fp.setDate(null);
+        return;
+      }
+
+      // For month select, use custom parsing
+      if (this.isMonthSelect) {
+        const parsedDate = this.parseMonthSelectDate(value);
+        this.fp.setDate(parsedDate);
+      } else {
         this.fp.setDate(value);
       }
     },
 
-    init: function () {
+    /**
+     * Format selected dates according to the configured format
+     * @param {Date[]} selectedDates - Array of selected Date objects
+     * @returns {string|string[]} Formatted date(s)
+     */
+    formatSelectedDates(selectedDates) {
+      if (this.isRangePicker || this.isMultipleMode) {
+        return selectedDates.map((date) =>
+          flatpickr.formatDate(date, this.packageConfig.dateFormat)
+        );
+      }
+      return flatpickr.formatDate(selectedDates[0], this.packageConfig.dateFormat);
+    },
+
+    /**
+     * Handle date change event
+     */
+    handleDateChange(selectedDates, dateStr, instance) {
+      if (!selectedDates?.length) {
+        this.state = null;
+        return;
+      }
+
+      this.state = this.formatSelectedDates(selectedDates);
+    },
+
+
+    /**
+     * Create month select plugin configuration
+     * @returns {MonthSelect} MonthSelect plugin instance
+     */
+    createMonthSelectPlugin() {
+      return new MonthSelect({
+        shorthand: false,
+        dateFormat: this.packageConfig.dateFormat,
+        altInput: true,
+        altFormat: "F, Y",
+        theme: this.mode,
+      });
+    },
+
+    /**
+     * Get default date for month select
+     * @returns {Date|string|undefined} Default date value
+     */
+    getMonthSelectDefaultDate() {
+      if (!this.state) return undefined;
+      
+      if (this.packageConfig.dateFormat === 'Y-m') {
+        return new Date(`${this.state}-01T00:00:00Z`);
+      }
+      
+      return this.state;
+    },
+
+    /**
+     * Apply dark theme stylesheet
+     */
+    applyDarkTheme() {
+      if (this.themeMode === "dark") {
+        const themeElement = document.querySelector("#pickr-theme");
+        if (themeElement) {
+          themeElement.href = this.attribs.darkThemeAsset;
+        }
+      }
+    },
+
+    /**
+     * Handle theme change event
+     */
+    handleThemeChange(event) {
+      this.mode = event.detail.dark ? "dark" : "light";
+      const themeElement = document.querySelector("#pickr-theme");
+      if (themeElement) {
+        themeElement.href = this.mode === "dark"
+          ? this.attribs.darkThemeAsset
+          : this.attribs.themeAsset;
+      }
+    },
+
+    init() {
       this.mode = this.darkStatus ? "dark" : "light";
+      
+      // Build flatpickr configuration
       const config = {
         mode: this.attribs.mode,
         time_24hr: true,
@@ -51,101 +187,38 @@ export default function flatpickrDatepicker(args) {
         static: false,
         locale: this.locale,
         ...this.packageConfig,
-        plugins: [
-          new ConfirmDate({
-            confirmText: "OK",
-            showAlways: false,
-            theme: this.mode,
-          }),
-        ],
-
+        plugins: [],
         onChange: (selectedDates, dateStr, instance) => {
-          if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
-            const formattedDates = selectedDates.map((date) => {
-              return flatpickr.formatDate(
-                new Date(date),
-                this.packageConfig.dateFormat
-              );
-            });
-            this.setState(formattedDates);
-          } else {
-            this.setState(dateStr);
-          }
+          this.handleDateChange(selectedDates, dateStr, instance);
         },
-        onClose(selectedDates, dateStr, instance) {
-          instance.setDate(selectedDates, true)
-        }
-
       };
-      if (this.getMode === "dark") {
-        let el = document.querySelector("#pickr-theme");
-        if (el) {
-          el.href = this.attribs.darkThemeAsset;
-        }
-      }
-      if (this.attribs.monthSelect) {
-        config.plugins.push(
-          new MonthSelect({
-            shorthand: false, //defaults to false
-            dateFormat: this.packageConfig.dateFormat, //defaults to "F Y"
-            altInput: true,
-            altFormat: "F, Y", //defaults to "F Y"
-            theme: this.mode, // defaults to "light"
-          })
-        );
-      } else if (this.attribs.weekSelect) {
-        config.plugins.push(new WeekSelect({}));
-      } /* else if (this.attribs.rangePicker) {
-                config.plugins.push(new RangePlugin({}))
-            }*/
 
+      // Apply dark theme if needed
+      this.applyDarkTheme();
+
+      // Add plugins based on configuration
+      if (this.isMonthSelect) {
+        config.plugins.push(this.createMonthSelectPlugin());
+        const defaultDate = this.getMonthSelectDefaultDate();
+        if (defaultDate) {
+          config.defaultDate = defaultDate;
+        }
+      } else if (this.isWeekSelect) {
+        config.plugins.push(new WeekSelect({}));
+      }
+
+      // Initialize flatpickr
       this.fp = flatpickr(this.$refs.picker, config);
       this.setFlatpickrDate(this.state);
 
-      // this.$refs.picker.addEventListener("change", (e) => {
-      //   console.log('test');
-      //   if (this.fp) {
-
-      //     if (this.attribs.rangePicker || this.attribs.mode === "multiple") {
-      //       const formattedDates = this.fp.selectedDates.map((date) => {
-      //         return flatpickr.formatDate(
-      //           new Date(date),
-      //           this.packageConfig.dateFormat
-      //         );
-      //       });
-      //       this.setState(formattedDates);
-      //     } else {
-      //       const formattedDate = flatpickr.formatDate(
-      //         new Date(this.fp.selectedDates[0]),
-      //         this.packageConfig.dateFormat
-      //       );
-
-      //       this.setState(formattedDate);
-      //     }
-
-      //     console.log(this.state);
-
-      //   }
-      // });
-
+      // Setup event listeners
       window.addEventListener("theme-changed", (e) => {
-        this.mode = e.detail.dark ? "dark" : "light";
-
-        let href;
-        if (this.mode === "dark") {
-          href = this.attribs.darkThemeAsset;
-        } else {
-          href = this.attribs.themeAsset;
-        }
-        document.querySelector("#pickr-theme").href = href;
+        this.handleThemeChange(e);
       });
 
-      this.$watch("state", () => {
-        if (this.state === undefined) {
-          this.setFlatpickrDate(null);
-          return;
-        }
-        this.setFlatpickrDate(this.state);
+      // Watch for state changes using Alpine's reactive system
+      this.$watch("state", (value) => {
+        this.setFlatpickrDate(value ?? null);
       });
     },
   };

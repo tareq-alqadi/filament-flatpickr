@@ -243,9 +243,21 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             return static::dehydratePickerState($component, $state);
         });
 
-        $this->afterStateHydrated(static function (Flatpickr $component, $state): void {
+        $this->afterStateHydrated(function (?string $state, Flatpickr $component) {
             if (blank($state)) {
                 return;
+            }
+
+            if ($component->isTime()) {
+                return $state;
+            }
+
+            if ($component->isMonthSelect()) {
+                return $state;
+            }
+
+            if (blank($state)) {
+                return null;
             }
 
             if (!$state instanceof CarbonInterface) {
@@ -255,18 +267,14 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
                     try {
                         $state = Carbon::parse($state, config('app.timezone'));
                     } catch (InvalidFormatException $exception) {
-                        $component->state(null);
-
-                        return;
+                        return null;
                     }
                 }
 
                 $state = $state->setTimezone($component->getTimezone());
             }
 
-            $component->getConfig();
-
-            $component->state($state->format($component->getDateFormat()));
+            return $state->format($component->getDateFormat());
         });
 
         /*$this->rule(
