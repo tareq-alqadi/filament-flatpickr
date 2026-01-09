@@ -150,6 +150,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             $this->enableTime(false);
             $this->time(false);
             $this->range(false);
+            $this->timezone('UTC');
             $this->dateFormat('Y-m');
             $this->altFormat('F J');
             $this->altInput();
@@ -285,10 +286,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         if (!$state instanceof CarbonInterface) {
             if ($component->isMonthSelect()) {
                 try {
-                    $state = Carbon::createFromFormat($component->getDateFormat(), $state)->setDay(1);
+                    $state = Carbon::createFromFormat($component->getDateFormat(), $state);
                 } catch (InvalidFormatException $exception) {
                     try {
-                        $state = Carbon::parse($state)->setDay(1);
+                        $state = Carbon::parse($state);
                     } catch (InvalidFormatException $exception) {
                         $component->state(null);
 
@@ -296,8 +297,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
                     }
                 }
 
-                $state->shiftTimezone($component->getTimezone());
-                $state->setTimezone(config('app.timezone'));
+                $state
+                    ->shiftTimezone($component->getTimezone())
+                    ->setTimezone(config('app.timezone'))
+                    ->startOfMonth();
             } elseif ($component->getMode() === FlatpickrMode::TIME->value) {
             } elseif ($component->getMode() === FlatpickrMode::SINGLE->value) {
                 try {
