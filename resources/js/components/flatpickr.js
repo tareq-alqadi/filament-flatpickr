@@ -53,21 +53,33 @@ export default function flatpickrDatepicker(args) {
 
     /**
      * Parse a date string for month select format (Y-m)
-     * @param {string} dateValue - Date string in Y-m format
+     * @param {string} dateValue - Date string in Y-m format (e.g., "2024-01")
      * @returns {Date|null} Parsed date or null
      */
     parseMonthSelectDate(dateValue) {
       if (!dateValue) return null;
       
-      // Try parsing with flatpickr's parseDate
-      if (this.fp) {
-        const parsed = this.fp.parseDate(dateValue, this.packageConfig.dateFormat);
-        if (parsed) return parsed;
+      // For 'Y-m' format, JavaScript Date can parse it directly
+      if (this.packageConfig.dateFormat === 'Y-m') {
+        const dateWithDay = `${dateValue}-01T00:00:00Z`;
+        const parsed = new Date(dateWithDay);
+        
+        // Validate the parsed date
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
       }
       
-      // Fallback: manually parse Y-m format by appending day
-      if (this.packageConfig.dateFormat === 'Y-m') {
-        return new Date(`${dateValue}-01T00:00:00Z`);
+      // Try parsing with flatpickr's parseDate as fallback
+      if (this.fp) {
+        try {
+          const parsed = this.fp.parseDate(dateValue, this.packageConfig.dateFormat);
+          if (parsed && !isNaN(parsed.getTime())) {
+            return parsed;
+          }
+        } catch (e) {
+          // flatpickr parseDate failed, continue to return null
+        }
       }
       
       return null;
@@ -142,8 +154,15 @@ export default function flatpickrDatepicker(args) {
     getMonthSelectDefaultDate() {
       if (!this.state) return undefined;
       
+      // For 'Y-m' format, JavaScript Date can parse it directly
       if (this.packageConfig.dateFormat === 'Y-m') {
-        return new Date(`${this.state}-01T00:00:00Z`);
+        const dateWithDay = `${this.state}-01T00:00:00Z`;
+        const parsed = new Date(dateWithDay);
+        
+        // Validate the parsed date
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
       }
       
       return this.state;
@@ -209,6 +228,10 @@ export default function flatpickrDatepicker(args) {
 
       // Initialize flatpickr
       this.fp = flatpickr(this.$refs.picker, config);
+      
+      // Set the initial date
+      // For month select, defaultDate is already set in config, but we also set it here
+      // to ensure it's properly displayed even if defaultDate didn't work
       this.setFlatpickrDate(this.state);
 
       // Setup event listeners

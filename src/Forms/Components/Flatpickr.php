@@ -52,7 +52,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected bool $enableTime = false;
 
-    protected ?string $dateFormat = 'Y-m-d';
+    protected ?string $dateFormat = 'Y m-d';
 
     protected FlatpickrTheme $theme = FlatpickrTheme::DEFAULT;
 
@@ -128,7 +128,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     {
         if ($this->isEnableTime()) {
             if (!Str::of($this->getDateFormat())->contains('H', ignoreCase: true)) {
-                $this->dateFormat('Y-m-d H:i:s');
+                $this->dateFormat('Y m-d H:i:s');
             }
             if (!Str::of($this->getAltFormat())->contains('H', ignoreCase: true)) {
                 $this->altFormat('F j Y H:i K');
@@ -252,8 +252,32 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
                 return $state;
             }
 
+            // Ensure config is set (this sets dateFormat to 'Y-m' for month select)
+            $component->getConfig();
+
             if ($component->isMonthSelect()) {
-                return $state;
+                // Parse the state (could be ISO datetime, Y-m string, Carbon instance, etc.)
+                if (!$state instanceof CarbonInterface) {
+                    try {
+                        // First try with the exact month format 'Y-m'
+                        $parsed = Carbon::createFromFormat($component->getDateFormat(), $state);
+                    } catch (InvalidFormatException $exception) {
+                        try {
+                            // Parse ISO datetime or any other format (from JavaScript)
+                            $parsed = Carbon::parse($state);
+                        } catch (InvalidFormatException $exception) {
+                            return null;
+                        }
+                    }
+                } else {
+                    $parsed = $state;
+                }
+
+                // Format as 'Y-m' (e.g., "2024-01") - this is what JavaScript expects
+                return $parsed
+                    ->setTimezone(config('app.timezone'))
+                    ->startOfMonth()
+                    ->format($component->getDateFormat()); // Returns 'Y-m' format (e.g., "2024-01")
             }
 
             if (blank($state)) {
@@ -262,10 +286,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
             if (!$state instanceof CarbonInterface) {
                 try {
-                    $state = Carbon::createFromFormat($component->getDateFormat(), (string) $state, config('app.timezone'));
+                    $state = Carbon::createFromFormat($component->getDateFormat(), (string) $state);
                 } catch (InvalidFormatException $exception) {
                     try {
-                        $state = Carbon::parse($state, config('app.timezone'));
+                        $state = Carbon::parse($state);
                     } catch (InvalidFormatException $exception) {
                         return null;
                     }
@@ -276,11 +300,6 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
             return $state->format($component->getDateFormat());
         });
-
-        /*$this->rule(
-            'date',
-            static fn(Flatpickr $component): bool => (!$component->isRangePicker() && !$component->isMultiplePicker() && !$component->isWeekSelect()),
-        );*/
     }
 
     public static function dehydratePickerState($component, $state)
@@ -326,20 +345,30 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
                 $state->shiftTimezone($component->getTimezone());
                 $state->setTimezone(config('app.timezone'));
             } elseif ($component->getMode() === FlatpickrMode::RANGE->value) {
-
                 $state = collect($state)
                     ->map(static function ($date) use ($component) {
-                        return Carbon::createFromFormat($component->getDateFormat(), $date)
-                            ->shiftTimezone($component->getTimezone())
-                            ->setTimezone(config('app.timezone'));
+                        try {
+                            return Carbon::createFromFormat($component->getDateFormat(), $date)
+                                ->shiftTimezone($component->getTimezone())
+                                ->setTimezone(config('app.timezone'));
+                        } catch (InvalidFormatException $exception) {
+                            return Carbon::parse($date)
+                                ->shiftTimezone($component->getTimezone())
+                                ->setTimezone(config('app.timezone'));
+                        }
                     })
                     ->toArray();
             } elseif ($component->getMode() === FlatpickrMode::MULTIPLE->value) {
-
                 $state = collect($state)->map(function ($date) use ($component) {
-                    return Carbon::createFromFormat($component->getDateFormat(), $date)
-                        ->shiftTimezone($component->getTimezone())
-                        ->setTimezone(config('app.timezone'));
+                    try {
+                        return Carbon::createFromFormat($component->getDateFormat(), $date)
+                            ->shiftTimezone($component->getTimezone())
+                            ->setTimezone(config('app.timezone'));
+                    } catch (InvalidFormatException $exception) {
+                        return Carbon::parse($date)
+                            ->shiftTimezone($component->getTimezone())
+                            ->setTimezone(config('app.timezone'));
+                    }
                 })
                     ->toArray();
             }
