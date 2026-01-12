@@ -243,7 +243,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             return static::dehydratePickerState($component, $state);
         });
 
-        $this->afterStateHydrated(function (?string $state, Flatpickr $component) {
+        $this->formatStateUsing(function (?string $state, Flatpickr $component) {
             if (blank($state)) {
                 return;
             }
