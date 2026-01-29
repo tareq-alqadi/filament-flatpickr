@@ -313,7 +313,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         if (!$state instanceof CarbonInterface) {
             if ($component->isMonthSelect()) {
                 try {
-                    $state = Carbon::createFromFormat($component->getDateFormat(), $state);
+                    $state = Carbon::createFromFormat($component->getDateFormat() . "-d", $state . "-01");
                 } catch (InvalidFormatException $exception) {
                     try {
                         $state = Carbon::parse($state);
