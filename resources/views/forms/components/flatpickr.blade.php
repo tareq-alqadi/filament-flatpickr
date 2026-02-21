@@ -31,7 +31,7 @@
     <link rel="stylesheet" id="pickr-theme" type="text/css" href="{{ $getThemeAsset() }}">
 
     <div x-data="flatpickrDatepicker({
-        state: $wire.{{ $applyStateBindingModifiers("entangle('{$getStatePath()}')") }},
+        state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$statePath}')") }},
         packageConfig: @js($config),
         attribs: @js($attribs),
         locale: '{{ config('app.locale') }}'
