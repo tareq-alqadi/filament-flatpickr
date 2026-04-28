@@ -1,6 +1,4 @@
 @php
-    use Filament\Support\Facades\FilamentView;
-
     $extraAlpineAttributes = $getExtraAlpineAttributes();
     $id = $getId();
     $isConcealed = $isConcealed();
@@ -30,17 +28,16 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     <link rel="stylesheet" id="pickr-theme" type="text/css" href="{{ $getThemeAsset() }}">
 
-    <div x-data="flatpickrDatepicker({
-        state: $wire.{{ $applyStateBindingModifiers("entangle('{$getStatePath()}')") }},
-        packageConfig: @js($config),
-        attribs: @js($attribs),
-        locale: '{{ config('app.locale') }}'
-    })" wire:ignore x-ignore
-        @if (FilamentView::hasSpaMode())
-            x-load="visible"
-        @else
-            x-load
-        @endif
+    <div
+        x-data="flatpickrDatepicker({
+                state: $wire.{{ $applyStateBindingModifiers("entangle('{$getStatePath()}')") }},
+                packageConfig: @js($config),
+                attribs: @js($attribs),
+                locale: '{{ config('app.locale') }}'
+            })"
+        wire:ignore
+        x-ignore
+        x-load
         x-load-css="[
             @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-css', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
             @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('month-select-style', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
@@ -63,7 +60,6 @@
                         'disabled' => $isDisabled,
                         'id' => $id,
                         'x-ref' => 'picker',
-                        // 'x-model' => 'state',
                         'inlinePrefix' =>
                             $isPrefixInline && (count($prefixActions) || $prefixIcon || filled($prefixLabel)),
                         'inlineSuffix' =>
