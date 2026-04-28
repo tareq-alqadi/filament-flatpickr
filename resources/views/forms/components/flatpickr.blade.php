@@ -30,7 +30,7 @@
 
     <div
         x-data="flatpickrDatepicker({
-                state: $wire.{{ $applyStateBindingModifiers("entangle('{$getStatePath()}')") }},
+                state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$statePath}')") }},
                 packageConfig: @js($config),
                 attribs: @js($attribs),
                 locale: '{{ config('app.locale') }}'
