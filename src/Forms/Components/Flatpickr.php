@@ -9,12 +9,14 @@ use Filament\Forms\Components\Concerns;
 use Filament\Forms\Components\Contracts;
 use Filament\Forms\Components\Field;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
+use TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr;
 
 class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 {
@@ -929,16 +931,34 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             $this->theme(FlatpickrTheme::LIGHT);
         }
 
-        return asset('css/' . static::PACKAGE_NAME . '/flatpickr-' . $this->getTheme() . '-theme.css');
+        return $this->resolveThemeStylesheetHref($this->getTheme());
     }
 
     public function getDarkThemeAsset(): string
     {
-        return asset('css/' . static::PACKAGE_NAME . '/flatpickr-dark-theme.css');
+        return FilamentAsset::getStyleHref(
+            FilamentFlatpickr::getThemeStylesheetId(FlatpickrTheme::DARK->value),
+            FilamentFlatpickr::getPackageName(),
+        );
     }
 
     public function getLightThemeAsset(): string
     {
-        return asset('css/' . static::PACKAGE_NAME . '/flatpickr-light-theme.css');
+        return FilamentAsset::getStyleHref(
+            FilamentFlatpickr::getThemeStylesheetId(FlatpickrTheme::LIGHT->value),
+            FilamentFlatpickr::getPackageName(),
+        );
+    }
+
+    protected function resolveThemeStylesheetHref(string $theme): string
+    {
+        $resolved = $theme === FlatpickrTheme::DEFAULT->value
+            ? FlatpickrTheme::LIGHT->value
+            : $theme;
+
+        return FilamentAsset::getStyleHref(
+            FilamentFlatpickr::getThemeStylesheetId($resolved),
+            FilamentFlatpickr::getPackageName(),
+        );
     }
 }

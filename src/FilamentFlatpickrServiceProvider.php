@@ -3,12 +3,13 @@
 namespace TareqAlqadi\FilamentFlatpickr;
 
 use Filament\Support\Assets\AlpineComponent;
+use Filament\Support\Assets\Asset;
 use Filament\Support\Assets\Css;
-use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use TareqAlqadi\FilamentFlatpickr\Commands\FilamentFlatpickrCommand;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 
 class FilamentFlatpickrServiceProvider extends PackageServiceProvider
 {
@@ -26,27 +27,44 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
             ->hasCommand(FilamentFlatpickrCommand::class);
     }
 
-    public function packageBooted()
+    public function packageBooted(): void
     {
+        FilamentAsset::register(
+            $this->getAssets(),
+            package: FilamentFlatpickr::getPackageName(),
+        );
+    }
 
-        FilamentAsset::register([
-            Js::make('flatpickr-range-plugin', __DIR__.'/../resources/assets/flatpickr/dist/plugins/rangePlugin.js')->loadedOnRequest(),
-            Js::make('flatpickr-confirm-date', __DIR__.'/../resources/assets/flatpickr/dist/plugins/confirmDate/confirmDate.js')->loadedOnRequest(),
-            Js::make('flatpickr-month-select-plugin', __DIR__.'/../resources/assets/flatpickr/dist/plugins/monthSelect/index.js')->loadedOnRequest(),
-            Js::make('flatpickr-week-select-plugin', __DIR__.'/../resources/assets/flatpickr/dist/plugins/weekSelect/weekSelect.js')->loadedOnRequest(),
-            Css::make('flatpickr-css', __DIR__.'/../resources/assets/flatpickr/dist/flatpickr.css')->loadedOnRequest(),
-            Css::make('month-select-style', __DIR__.'/../resources/assets/flatpickr/dist/plugins/monthSelect/style.css')->loadedOnRequest(),
-            Css::make('flatpickr-confirm-date-style', __DIR__.'/../resources/assets/flatpickr/dist/plugins/confirmDate/confirmDate.css')->loadedOnRequest(),
-            Css::make('flatpickr-airbnb-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/airbnb.css')->loadedOnRequest(),
-            Css::make('flatpickr-confetti-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/confetti.css')->loadedOnRequest(),
-            Css::make('flatpickr-dark-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/dark.css')->loadedOnRequest(),
-            Css::make('flatpickr-light-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/light.css')->loadedOnRequest(),
-            Css::make('flatpickr-default-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/light.css')->loadedOnRequest(),
-            Css::make('flatpickr-material_blue-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/material_blue.css')->loadedOnRequest(),
-            Css::make('flatpickr-material_green-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/material_green.css')->loadedOnRequest(),
-            Css::make('flatpickr-material_red-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/material_red.css')->loadedOnRequest(),
-            Css::make('flatpickr-material_orange-theme', __DIR__.'/../resources/assets/flatpickr/dist/themes/material_orange.css')->loadedOnRequest(),
-            AlpineComponent::make('flatpickr-component', __DIR__.'/../resources/js/dist/components/flatpickr-component.js')->loadedOnRequest(),
-        ], package: FilamentFlatpickr::getPackageName());
+    /**
+     * @return array<Asset>
+     */
+    protected function getAssets(): array
+    {
+        $assets = [
+            Css::make('flatpickr-css', $this->flatpickrDistPath('flatpickr.css'))->loadedOnRequest(),
+            Css::make('month-select-style', $this->flatpickrDistPath('plugins/monthSelect/style.css'))->loadedOnRequest(),
+            AlpineComponent::make('flatpickr', __DIR__.'/../resources/js/dist/flatpickr.js')->loadedOnRequest(),
+        ];
+
+        foreach (FlatpickrTheme::cases() as $theme) {
+            $filename = match ($theme) {
+                FlatpickrTheme::DEFAULT => 'light.css',
+                default => "{$theme->value}.css",
+            };
+
+            $assets[] = Css::make(
+                FilamentFlatpickr::getThemeStylesheetId($theme->value),
+                $this->flatpickrDistPath("themes/{$filename}"),
+            )->loadedOnRequest();
+        }
+
+        return $assets;
+    }
+
+    protected function flatpickrDistPath(string $path = ''): string
+    {
+        $base = __DIR__.'/../resources/assets/flatpickr/dist';
+
+        return $path ? "{$base}/{$path}" : $base;
     }
 }

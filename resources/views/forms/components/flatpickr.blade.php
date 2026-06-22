@@ -13,6 +13,15 @@
     $suffixLabel = $getSuffixLabel();
     $statePath = $getStatePath();
     $config = array_merge($getConfig(), $getCustomConfig());
+    $packageName = \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName();
+    $stylesheetHrefs = [
+        \Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-css', $packageName),
+    ];
+
+    if ($isMonthSelect()) {
+        $stylesheetHrefs[] = \Filament\Support\Facades\FilamentAsset::getStyleHref('month-select-style', $packageName);
+    }
+
     $attribs = [
         'disabled' => $isDisabled,
         'theme' => $getTheme() == 'default' ? 'default' : $getTheme(),
@@ -26,8 +35,6 @@
     ];
 @endphp
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
-    <link rel="stylesheet" id="pickr-theme" type="text/css" href="{{ $getThemeAsset() }}">
-
     <div
         x-data="flatpickrDatepicker({
                 state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$statePath}')") }},
@@ -38,13 +45,13 @@
         wire:ignore
         x-ignore
         x-load
-        x-load-css="[
-            @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-css', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
-            @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('month-select-style', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
-            @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-confirm-date-style', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())),
-            {{-- @js(\Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-'.$attribs['theme'].'-theme', \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName())) --}}
-        ]"
-        x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('flatpickr-component', package: \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName()) }}">
+        x-load-css="@js($stylesheetHrefs)"
+        x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('flatpickr', package: \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName()) }}">
+        <link
+            x-ref="themeStylesheet"
+            rel="stylesheet"
+            href="{{ $getThemeAsset() }}"
+        />
         <x-filament::input.wrapper :disabled="$isDisabled" :inline-prefix="$isPrefixInline" :inline-suffix="$isSuffixInline" :prefix="$prefixLabel"
             :prefix-actions="$prefixActions" :prefix-icon="$prefixIcon" :suffix="$suffixLabel" :suffix-actions="$suffixActions" :suffix-icon="$suffixIcon"
             :valid="!$errors->has($statePath)" class="fi-fo-text-input" :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class(array_filter([

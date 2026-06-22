@@ -45,6 +45,6 @@ const defaultOptions = {
 
 compile({
     ...defaultOptions,
-    entryPoints: ['./resources/js/components/flatpickr.js'],
-    outfile: './resources/js/dist/components/flatpickr-component.js',
+    entryPoints: ['./resources/js/flatpickr.js'],
+    outfile: './resources/js/dist/flatpickr.js',
 })
