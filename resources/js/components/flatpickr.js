@@ -181,6 +181,42 @@ export default function flatpickrDatepicker(args) {
     },
 
     /**
+     * Reposition the calendar after Filament modal / slide-over animations.
+     */
+    repositionCalendar(instance) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => instance._positionCalendar());
+      });
+    },
+
+    /**
+     * Chain with any onOpen handler from packageConfig / customConfig.
+     */
+    wrapOnOpen(existingOnOpen) {
+      return (selectedDates, dateStr, instance) => {
+        this.repositionCalendar(instance);
+
+        const modal = instance.element.closest(
+          '.fi-modal-window, .fi-modal-slide-over, dialog, [role="dialog"]',
+        );
+
+        if (modal) {
+          modal.addEventListener(
+            'transitionend',
+            () => this.repositionCalendar(instance),
+            { once: true },
+          );
+        }
+
+        if (Array.isArray(existingOnOpen)) {
+          existingOnOpen.forEach((fn) => fn(selectedDates, dateStr, instance));
+        } else if (typeof existingOnOpen === 'function') {
+          existingOnOpen(selectedDates, dateStr, instance);
+        }
+      };
+    },
+
+    /**
      * Handle theme change event
      */
     handleThemeChange(event) {
@@ -225,6 +261,9 @@ export default function flatpickrDatepicker(args) {
       } else if (this.isWeekSelect) {
         config.plugins.push(new WeekSelect({}));
       }
+
+      const existingOnOpen = config.onOpen;
+      config.onOpen = this.wrapOnOpen(existingOnOpen);
 
       // Initialize flatpickr
       this.fp = flatpickr(this.$refs.picker, config);

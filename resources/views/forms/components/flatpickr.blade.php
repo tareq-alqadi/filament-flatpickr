@@ -47,9 +47,9 @@
         x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('flatpickr-component', package: \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName()) }}">
         <x-filament::input.wrapper :disabled="$isDisabled" :inline-prefix="$isPrefixInline" :inline-suffix="$isSuffixInline" :prefix="$prefixLabel"
             :prefix-actions="$prefixActions" :prefix-icon="$prefixIcon" :suffix="$suffixLabel" :suffix-actions="$suffixActions" :suffix-icon="$suffixIcon"
-            :valid="!$errors->has($statePath)" class="fi-fo-text-input" :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class([
-                'overflow-hidden',
-            ])">
+            :valid="!$errors->has($statePath)" class="fi-fo-text-input" :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class(array_filter([
+                'overflow-hidden' => ! $isStatic(),
+            ]))">
             <x-filament::input :attributes="\Filament\Support\prepare_inherited_attributes($getExtraInputAttributeBag())
                 ->merge($extraAlpineAttributes, escape: false)
                 ->merge(

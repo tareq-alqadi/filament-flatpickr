@@ -204,6 +204,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             'monthSelectorType' => $this->monthSelectorType->value,
             'animate' => $this->animate,
             'closeOnSelect' => $this->closeOnSelect,
+            'static' => $this->isStatic(),
         ];
         if ($this->getEnabledDates()) {
             $config['enabled'] = $this->getEnabledDates();
