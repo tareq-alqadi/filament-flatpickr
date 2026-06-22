@@ -14,6 +14,10 @@ export default function flatpickrDatepicker(args) {
     
     // Internal state
     fp: null,
+    _repositionTimeoutIds: [],
+    _calendarObserver: null,
+    _onModalOpened: null,
+    _onTransitionEnd: null,
 
     // Computed properties
     get darkStatus() {
@@ -181,12 +185,113 @@ export default function flatpickrDatepicker(args) {
     },
 
     /**
-     * Reposition the calendar after Filament modal / slide-over animations.
+     * Reposition the calendar; retries through Filament modal animations (~300ms).
      */
-    repositionCalendar(instance) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => instance._positionCalendar());
+    scheduleReposition(instance) {
+      this.clearRepositionTimeouts();
+
+      const run = () => {
+        if (!instance?.isOpen) {
+          return;
+        }
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => instance._positionCalendar());
+        });
+      };
+
+      run();
+
+      [50, 150, 300].forEach((ms) => {
+        this._repositionTimeoutIds.push(setTimeout(run, ms));
       });
+    },
+
+    clearRepositionTimeouts() {
+      this._repositionTimeoutIds.forEach((id) => clearTimeout(id));
+      this._repositionTimeoutIds = [];
+    },
+
+    isInsideFilamentModal(element) {
+      return !!element?.closest?.(
+        '.fi-modal, .fi-modal-window, .fi-modal-slide-over, dialog, [role="dialog"]',
+      );
+    },
+
+    setupModalRepositionHooks(instance) {
+      const pickerEl = instance.element;
+
+      if (!this.isInsideFilamentModal(pickerEl)) {
+        return;
+      }
+
+      if (instance.calendarContainer) {
+        this._calendarObserver = new MutationObserver(() => {
+          if (!instance.isOpen) {
+            return;
+          }
+
+          this.scheduleReposition(instance);
+        });
+
+        this._calendarObserver.observe(instance.calendarContainer, {
+          attributes: true,
+          attributeFilter: ['class'],
+        });
+      }
+
+      this._onModalOpened = (event) => {
+        const containingModal = pickerEl.closest('[data-fi-modal-id]');
+
+        if (containingModal && event.detail?.id !== containingModal.dataset.fiModalId) {
+          return;
+        }
+
+        if (instance.isOpen) {
+          this.scheduleReposition(instance);
+        }
+      };
+
+      document.addEventListener('x-modal-opened', this._onModalOpened);
+
+      this._onTransitionEnd = (event) => {
+        if (!instance.isOpen) {
+          return;
+        }
+
+        const ourModal = pickerEl.closest('.fi-modal');
+
+        if (!ourModal?.contains(event.target)) {
+          return;
+        }
+
+        if (
+          event.target.closest?.(
+            '.fi-modal-window, .fi-modal-slide-over, [role="dialog"]',
+          )
+        ) {
+          this.scheduleReposition(instance);
+        }
+      };
+
+      document.addEventListener('transitionend', this._onTransitionEnd, true);
+    },
+
+    teardownModalRepositionHooks() {
+      this.clearRepositionTimeouts();
+
+      this._calendarObserver?.disconnect();
+      this._calendarObserver = null;
+
+      if (this._onModalOpened) {
+        document.removeEventListener('x-modal-opened', this._onModalOpened);
+        this._onModalOpened = null;
+      }
+
+      if (this._onTransitionEnd) {
+        document.removeEventListener('transitionend', this._onTransitionEnd, true);
+        this._onTransitionEnd = null;
+      }
     },
 
     /**
@@ -194,19 +299,7 @@ export default function flatpickrDatepicker(args) {
      */
     wrapOnOpen(existingOnOpen) {
       return (selectedDates, dateStr, instance) => {
-        this.repositionCalendar(instance);
-
-        const modal = instance.element.closest(
-          '.fi-modal-window, .fi-modal-slide-over, dialog, [role="dialog"]',
-        );
-
-        if (modal) {
-          modal.addEventListener(
-            'transitionend',
-            () => this.repositionCalendar(instance),
-            { once: true },
-          );
-        }
+        this.scheduleReposition(instance);
 
         if (Array.isArray(existingOnOpen)) {
           existingOnOpen.forEach((fn) => fn(selectedDates, dateStr, instance));
@@ -214,6 +307,24 @@ export default function flatpickrDatepicker(args) {
           existingOnOpen(selectedDates, dateStr, instance);
         }
       };
+    },
+
+    wrapOnClose(existingOnClose) {
+      return (selectedDates, dateStr, instance) => {
+        this.clearRepositionTimeouts();
+
+        if (Array.isArray(existingOnClose)) {
+          existingOnClose.forEach((fn) => fn(selectedDates, dateStr, instance));
+        } else if (typeof existingOnClose === 'function') {
+          existingOnClose(selectedDates, dateStr, instance);
+        }
+      };
+    },
+
+    destroy() {
+      this.teardownModalRepositionHooks();
+      this.fp?.destroy();
+      this.fp = null;
     },
 
     /**
@@ -265,8 +376,15 @@ export default function flatpickrDatepicker(args) {
       const existingOnOpen = config.onOpen;
       config.onOpen = this.wrapOnOpen(existingOnOpen);
 
+      const existingOnClose = config.onClose;
+      config.onClose = this.wrapOnClose(existingOnClose);
+
       // Initialize flatpickr
       this.fp = flatpickr(this.$refs.picker, config);
+
+      if (!this.fp.config.static && !this.fp.config.inline) {
+        this.setupModalRepositionHooks(this.fp);
+      }
       
       // Set the initial date
       // For month select, defaultDate is already set in config, but we also set it here
