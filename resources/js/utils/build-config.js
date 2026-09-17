@@ -18,6 +18,7 @@ export function buildFlatpickrConfig(component, modalReposition) {
     onChange: (selectedDates) => {
       if (!selectedDates?.length) {
         component.state = null;
+
         return;
       }
 

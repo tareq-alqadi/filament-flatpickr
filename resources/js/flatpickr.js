@@ -20,6 +20,8 @@ export default function flatpickrDatepicker({
 }) {
   let modalReposition = null;
   let onThemeChanged = null;
+  let onInput = null;
+  let onBlur = null;
 
   return {
     state,
@@ -48,6 +50,7 @@ export default function flatpickrDatepicker({
 
       if (!value) {
         this.fp.setDate(null);
+
         return;
       }
 
@@ -57,6 +60,7 @@ export default function flatpickrDatepicker({
           this.packageConfig.dateFormat,
           this.fp,
         );
+
         this.fp.setDate(parsedDate);
       } else {
         this.fp.setDate(value);
@@ -74,6 +78,21 @@ export default function flatpickrDatepicker({
         modalReposition.attach(this.fp);
       }
 
+      onInput = () => {
+        if (!this.$refs.picker.value?.trim()) {
+          this.state = null;
+        }
+      };
+
+      onBlur = () => {
+        if (!this.$refs.picker.value?.trim()) {
+          this.state = null;
+        }
+      };
+
+      this.$refs.picker.addEventListener('input', onInput);
+      this.$refs.picker.addEventListener('blur', onBlur);
+
       this.$nextTick(() => {
         applyDarkTheme(this);
       });
@@ -89,6 +108,14 @@ export default function flatpickrDatepicker({
     },
 
     destroy() {
+      if (this.$refs.picker) {
+        this.$refs.picker.removeEventListener('input', onInput);
+        this.$refs.picker.removeEventListener('blur', onBlur);
+      }
+
+      onInput = null;
+      onBlur = null;
+
       if (onThemeChanged) {
         window.removeEventListener('theme-changed', onThemeChanged);
         onThemeChanged = null;

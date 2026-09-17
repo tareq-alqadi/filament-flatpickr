@@ -12,6 +12,7 @@
     $suffixIcon = $getSuffixIcon();
     $suffixLabel = $getSuffixLabel();
     $statePath = $getStatePath();
+    $livewireKey = $getLivewireKey();
     $config = array_merge($getConfig(), $getCustomConfig());
     $packageName = \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName();
     $stylesheetHrefs = [
@@ -43,6 +44,7 @@
                 locale: '{{ config('app.locale') }}'
             })"
         wire:ignore
+        wire:key="{{ $livewireKey }}.{{ substr(md5(serialize([$getDisabledDates(), $isDisabled, $isReadOnly(), $getMinDate(), $getMaxDate(), $getMode(), $isRangePicker(), $isMonthSelect()])), 0, 64) }}"
         x-ignore
         x-load
         x-load-css="@js($stylesheetHrefs)"
