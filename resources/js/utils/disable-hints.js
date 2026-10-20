@@ -36,8 +36,20 @@ export function disableBrowserHints(fp, { allowTyping = false } = {}) {
     return;
   }
 
-  [fp.input, fp.altInput, fp.currentYearElement, fp.hourElement, fp.minuteElement, fp.secondElement]
-    .forEach(mark);
+  const numericInputs = [
+    ...(fp.yearElements ?? [fp.currentYearElement]),
+    fp.hourElement,
+    fp.minuteElement,
+    fp.secondElement,
+  ];
+
+  [fp.input, fp.altInput, ...numericInputs].forEach(mark);
+
+  numericInputs.forEach((input) => {
+    if (input && !input.hasAttribute('lang')) {
+      input.setAttribute('lang', 'en');
+    }
+  });
 
   const field = fp.altInput ?? fp.input;
 
