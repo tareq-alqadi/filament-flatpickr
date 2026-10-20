@@ -8,6 +8,7 @@ use Closure;
 use Filament\Forms\Components\Concerns;
 use Filament\Forms\Components\Contracts;
 use Filament\Forms\Components\Field;
+use Filament\Schemas\Components\StateCasts\Contracts\StateCast;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\Carbon;
@@ -17,6 +18,7 @@ use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 use TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr;
+use TareqAlqadi\FilamentFlatpickr\StateCasts\FlatpickrStateCast;
 
 class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 {
@@ -35,6 +37,8 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     protected string $view = 'tareq-alqadi-filament-flatpickr::forms.components.flatpickr';
 
     protected bool $monthSelect = false;
+
+    protected bool|Closure $castsStateToDates = false;
 
     protected bool $time = false;
 
@@ -161,7 +165,8 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             $this->enableTime(false);
             $this->time(false);
             $this->range(false);
-            $this->dateFormat('W');
+            // The state keeps the day picked, so the week's year isn't lost; the picker shows its week number.
+            $this->dateFormat('Y-m-d');
             $this->altFormat('\Week W');
             $this->altInput();
         }
@@ -246,9 +251,23 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             return static::dehydratePickerState($component, $state);
         });
 
-        $this->formatStateUsing(function (?string $state, Flatpickr $component) {
+        $this->formatStateUsing(function (mixed $state, Flatpickr $component) {
+            // The state cast turns the date back into what the picker shows when the state is set.
+            if ($component->shouldCastStateToDates()) {
+                return $state;
+            }
+
+            if ($state instanceof CarbonInterface) {
+                $state = (string) $state;
+            }
+
             if (blank($state)) {
                 return;
+            }
+
+            // Range and multiple pickers hold a list: each date is shown the way the state cast shows it.
+            if (is_array($state)) {
+                return (new FlatpickrStateCast($component))->set($state);
             }
 
             if ($component->isTime()) {
@@ -305,6 +324,94 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         });
     }
 
+    /**
+     * Makes `$get()` and the state give dates instead of the text the picker shows, the way an enum select gives its
+     * enum: a date, a list of dates for range and multiple pickers, or null. `$set()` and defaults take dates too.
+     */
+    public function castsStateToDates(bool|Closure $condition = true): static
+    {
+        $this->castsStateToDates = $condition;
+
+        return $this;
+    }
+
+    public function shouldCastStateToDates(): bool
+    {
+        return (bool) $this->evaluate($this->castsStateToDates);
+    }
+
+    /**
+     * @return array<StateCast>
+     */
+    public function getDefaultStateCasts(): array
+    {
+        if (!$this->shouldCastStateToDates()) {
+            return parent::getDefaultStateCasts();
+        }
+
+        return [...parent::getDefaultStateCasts(), new FlatpickrStateCast($this)];
+    }
+
+    /**
+     * Reads a value of this picker, such as `$get('start_date')` while the form is live, as the user picked it: in the
+     * picker's date format and timezone. A date without a time is the start of that day, a month the start of the
+     * month, a week the day picked in it. Range and multiple pickers give a list of dates, a time picker its value as it
+     * is, and a value that isn't a date gives null.
+     *
+     * @return CarbonInterface|array<int, CarbonInterface>|string|null
+     */
+    public function parseState(mixed $state): CarbonInterface|array|string|null
+    {
+        $this->getConfig();
+
+        if (blank($state)) {
+            return null;
+        }
+
+        if ($this->isTime()) {
+            return $state;
+        }
+
+        if ($this->isMonthSelect()) {
+            return $this->parseDate($state)?->startOfMonth();
+        }
+
+        if (in_array($this->getMode(), [FlatpickrMode::RANGE->value, FlatpickrMode::MULTIPLE->value], true)) {
+            return collect($state)
+                ->map(fn (mixed $date): ?CarbonInterface => $this->parseDate($date))
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        return $this->parseDate($state);
+    }
+
+    /**
+     * One date in the picker's format and timezone. A date given in code, or a value as stored in any format Carbon
+     * reads, is a moment for a picker with a time, shown in the picker's timezone, and otherwise the calendar day it
+     * falls on, in the app's timezone for a serialized value (a stored day comes back as "…T21:00:00Z" in a timezone
+     * ahead of UTC).
+     */
+    protected function parseDate(mixed $date): ?CarbonInterface
+    {
+        if (!$date instanceof CarbonInterface) {
+            try {
+                return Carbon::createFromFormat('!'.$this->getDateFormat(), (string) $date, $this->getTimezone());
+            } catch (InvalidFormatException) {
+                try {
+                    $date = Carbon::parse((string) $date, config('app.timezone'))->setTimezone(config('app.timezone'));
+                } catch (InvalidFormatException) {
+                    return null;
+                }
+            }
+        }
+
+        return $this->isEnableTime()
+            ? $date->avoidMutation()->setTimezone($this->getTimezone())
+            : $date->avoidMutation()->startOfDay()->shiftTimezone($this->getTimezone());
+    }
+
     public static function dehydratePickerState($component, $state)
     {
         $component->getConfig();
@@ -313,71 +420,33 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             return null;
         }
 
-        if (!$state instanceof CarbonInterface) {
-            if ($component->isMonthSelect()) {
-                try {
-                    $state = Carbon::createFromFormat($component->getDateFormat() . "-d", $state . "-01");
-                } catch (InvalidFormatException $exception) {
-                    try {
-                        $state = Carbon::parse($state);
-                    } catch (InvalidFormatException $exception) {
-                        $component->state(null);
-
-                        return;
-                    }
-                }
-
-                $state
-                    ->shiftTimezone($component->getTimezone())
-                    ->setTimezone(config('app.timezone'))
-                    ->startOfMonth();
-            } elseif ($component->getMode() === FlatpickrMode::TIME->value) {
-            } elseif ($component->getMode() === FlatpickrMode::SINGLE->value) {
-                try {
-                    $state = Carbon::createFromFormat($component->getDateFormat(), $state);
-                } catch (InvalidFormatException $exception) {
-                    try {
-                        $state = Carbon::parse($state);
-                    } catch (InvalidFormatException $exception) {
-                        $component->state(null);
-
-                        return;
-                    }
-                }
-
-                $state->shiftTimezone($component->getTimezone());
-                $state->setTimezone(config('app.timezone'));
-            } elseif ($component->getMode() === FlatpickrMode::RANGE->value) {
-                $state = collect($state)
-                    ->map(static function ($date) use ($component) {
-                        try {
-                            return Carbon::createFromFormat($component->getDateFormat(), $date)
-                                ->shiftTimezone($component->getTimezone())
-                                ->setTimezone(config('app.timezone'));
-                        } catch (InvalidFormatException $exception) {
-                            return Carbon::parse($date)
-                                ->shiftTimezone($component->getTimezone())
-                                ->setTimezone(config('app.timezone'));
-                        }
-                    })
-                    ->toArray();
-            } elseif ($component->getMode() === FlatpickrMode::MULTIPLE->value) {
-                $state = collect($state)->map(function ($date) use ($component) {
-                    try {
-                        return Carbon::createFromFormat($component->getDateFormat(), $date)
-                            ->shiftTimezone($component->getTimezone())
-                            ->setTimezone(config('app.timezone'));
-                    } catch (InvalidFormatException $exception) {
-                        return Carbon::parse($date)
-                            ->shiftTimezone($component->getTimezone())
-                            ->setTimezone(config('app.timezone'));
-                    }
-                })
-                    ->toArray();
-            }
+        if ($component->getMode() === FlatpickrMode::TIME->value) {
+            return $state;
         }
 
-        return $state;
+        // Dates given by the state cast are parsed already; they still go to the app's timezone. A month is its first day.
+        $parsed = $component->parseState($state);
+
+        if (blank($parsed)) {
+            $component->state(null);
+
+            return;
+        }
+
+        return is_array($parsed)
+            ? array_map(static fn (CarbonInterface $date): CarbonInterface => static::toAppTimezone($component, $date), $parsed)
+            : static::toAppTimezone($component, $parsed);
+    }
+
+    /**
+     * A date with a time is the same moment in the app's timezone. A date without one is a calendar day, which has no
+     * timezone: it stays that day, so a day picked just after midnight isn't saved as the day before.
+     */
+    protected static function toAppTimezone(Flatpickr $component, CarbonInterface $date): CarbonInterface
+    {
+        return $component->isEnableTime()
+            ? $date->setTimezone(config('app.timezone'))
+            : $date->shiftTimezone(config('app.timezone'));
     }
 
     public function mode(FlatpickrMode $mode): static
