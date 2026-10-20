@@ -1,4 +1,17 @@
-import flatpickrDatepicker from '../../resources/js/flatpickr.js';
+import filamentFlatpickr from '../../resources/js/index.js';
+
+/**
+ * The flatpickr options the server sends for each kind of picker (BasePicker::getConfig()), without limits.
+ */
+export const KINDS = {
+  date: { mode: 'single', dateFormat: 'Y-m-d', altFormat: 'F j, Y', enableTime: false, noCalendar: false },
+  datetime: { mode: 'single', dateFormat: 'Y-m-d H:i:S', altFormat: 'F j, Y H:i', enableTime: true, noCalendar: false },
+  time: { mode: 'single', dateFormat: 'H:i:S', altFormat: 'H:i', enableTime: true, noCalendar: true },
+  range: { mode: 'range', dateFormat: 'Y-m-d', altFormat: 'F j, Y', enableTime: false, noCalendar: false },
+  multiple: { mode: 'multiple', dateFormat: 'Y-m-d', altFormat: 'F j, Y', enableTime: false, noCalendar: false },
+  month: { mode: 'single', dateFormat: 'Y-m-d', altFormat: 'F Y', enableTime: false, noCalendar: false },
+  week: { mode: 'single', dateFormat: 'Y-m-d', altFormat: '\\W\\e\\e\\k W, Y', enableTime: false, noCalendar: false },
+};
 
 const mounted = [];
 
@@ -7,7 +20,7 @@ const mounted = [];
  * state that fires after it changes, in a microtask as Alpine's does. Await `settle()` before checking what a watcher
  * did.
  */
-export function mount({ state = null, packageConfig = {}, attribs = {}, locale = 'en', themeStylesheet = null } = {}) {
+export function mount({ kind = 'date', config = {}, state = null, ...options } = {}) {
   const input = document.createElement('input');
   const inlineCalendar = document.createElement('div');
 
@@ -15,11 +28,11 @@ export function mount({ state = null, packageConfig = {}, attribs = {}, locale =
 
   const watchers = [];
 
-  const data = flatpickrDatepicker({
+  const data = filamentFlatpickr({
+    kind,
+    config: { altInput: true, altInputClass: '', time_24hr: true, ...KINDS[kind], ...config },
     state,
-    packageConfig: { dateFormat: 'Y-m-d', ...packageConfig },
-    attribs: { mode: 'single', nativeTheme: true, ...attribs },
-    locale,
+    ...options,
   });
 
   const component = new Proxy(data, {
@@ -36,7 +49,7 @@ export function mount({ state = null, packageConfig = {}, attribs = {}, locale =
     },
   });
 
-  data.$refs = { picker: input, themeStylesheet, inlineCalendar };
+  data.$refs = { input, inlineCalendar };
   data.$watch = (key, watcher) => watchers.push(watcher);
 
   component.init();
@@ -68,7 +81,6 @@ export function ymd(date) {
 export function unmountAll() {
   mounted.splice(0).forEach((component) => component.destroy());
   document.body.innerHTML = '';
-  document.documentElement.classList.remove('dark');
 }
 
 /**

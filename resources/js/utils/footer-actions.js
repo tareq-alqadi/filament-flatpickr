@@ -4,9 +4,9 @@ import { ensureCalendarMainWrapper } from './calendar-layout.js';
  * Adds a footer with Today, Clear and Apply shortcuts to the calendar.
  */
 export function attachFooterActions(fp, component) {
-  const { todayButton, clearButton, applyButton, labels = {} } = component.attribs;
+  const { today: todayLabel, clear: clearLabel, apply: applyLabel } = component.footerActions ?? {};
 
-  if ((!todayButton && !clearButton && !applyButton) || !fp.calendarContainer) {
+  if ((!todayLabel && !clearLabel && !applyLabel) || !fp.calendarContainer) {
     return;
   }
 
@@ -39,31 +39,38 @@ export function attachFooterActions(fp, component) {
     return button;
   };
 
-  if (clearButton) {
-    addButton(labels.clear ?? 'Clear', 'fi-fp-footer-btn-muted', () => {
+  if (clearLabel) {
+    addButton(clearLabel, 'fi-fp-footer-btn-muted', () => {
       component.clear();
       fp.close();
     });
   }
 
-  if (todayButton) {
-    // A picker without a time gets the start of today: flatpickr compares "now" with a disabled day to the second,
-    // so it would let today through.
+  if (todayLabel) {
+    // A picker with a time gets now, a month picker this month, and others the start of today: flatpickr compares
+    // "now" with a disabled day to the second, so it would let today through.
     const today = () => {
       const now = new Date();
 
-      return fp.config.enableTime ? now : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (fp.config.enableTime) {
+        return now;
+      }
+
+      return component.kind === 'month'
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : new Date(now.getFullYear(), now.getMonth(), now.getDate());
     };
 
-    const button = addButton(labels.today ?? 'Today', 'fi-fp-footer-btn-primary', () => {
+    const button = addButton(todayLabel, 'fi-fp-footer-btn-primary', () => {
       const date = today();
 
       if (!fp.isEnabled(date)) {
         return;
       }
 
-      fp.setDate(component.attribs.mode === 'range' ? [date, date] : [date], true);
+      // Showing the month first keeps the week picker, which reads the day drawn as picked, on the right week.
       fp.jumpToDate(date);
+      fp.setDate(component.kind === 'range' ? [date, date] : [date], true);
     });
 
     // Today can't be picked before minDate, after maxDate or on a disabled day. It is checked whenever the calendar
@@ -76,8 +83,8 @@ export function attachFooterActions(fp, component) {
     fp.config.onOpen.push(refresh);
   }
 
-  if (applyButton) {
-    addButton(labels.apply ?? 'Apply', 'fi-fp-footer-btn-primary', () => {
+  if (applyLabel) {
+    addButton(applyLabel, 'fi-fp-footer-btn-primary', () => {
       fp.close();
     });
   }

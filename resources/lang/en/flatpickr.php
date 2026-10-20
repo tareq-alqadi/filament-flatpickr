@@ -13,4 +13,5 @@ return [
     'this_month' => 'This Month',
     'last_month' => 'Last Month',
     'this_year' => 'This Year',
+    'week' => 'Week',
 ];

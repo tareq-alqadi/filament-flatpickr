@@ -8,9 +8,4 @@ class FilamentFlatpickr
     {
         return 'tareq-alqadi/filament-flatpickr';
     }
-
-    public static function getThemeStylesheetId(string $theme): string
-    {
-        return "flatpickr-{$theme}-theme";
-    }
 }

@@ -1,5 +1,5 @@
-/* The field around every picker, whatever the calendar's theme: the clear button, the pointer, right-to-left
-   pages, and room for a static() or inline() calendar. */
+/* The field around every picker: the clear button, the pointer, right-to-left pages, room for a static() or inline()
+   calendar, and the presets and footer buttons. */
 
 /* Clear button. Sized in this stylesheet so it cannot stretch the field. */
 

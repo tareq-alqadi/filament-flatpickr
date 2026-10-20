@@ -1,20 +1,31 @@
 <?php
 
-use Carbon\CarbonInterface;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
-use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
-use TareqAlqadi\FilamentFlatpickr\Forms\Components\Flatpickr;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\DatePicker;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\DateRangePicker;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\DateTimePicker;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\MonthPicker;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\MultiDatePicker;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\TimePicker;
+use TareqAlqadi\FilamentFlatpickr\Forms\Components\WeekPicker;
 
-class FlatpickrTestForm extends Component implements HasForms
+class PickerTestForm extends Component implements HasForms
 {
     use InteractsWithForms;
 
-    public static ?Closure $field = null;
+    /**
+     * @var Closure(): array<int, mixed>
+     */
+    public static ?Closure $components = null;
 
     public static array $fill = [];
 
@@ -24,19 +35,20 @@ class FlatpickrTestForm extends Component implements HasForms
 
     public function mount(): void
     {
-        $this->form->fill(static::$fill);
+        // An empty fill() applies the fields' defaults.
+        $this->form->fill(static::$fill ?: null);
     }
 
     public function form(Schema $schema): Schema
     {
         return $schema
-            ->components([(static::$field)()])
+            ->components((static::$components)())
             ->statePath('data');
     }
 
     public function save(): void
     {
-        $this->saved = $this->form->getState()['date'] ?? null;
+        $this->saved = $this->form->getState();
     }
 
     public function render(): string
@@ -45,207 +57,186 @@ class FlatpickrTestForm extends Component implements HasForms
     }
 }
 
-function testForm(Closure $field, array $fill = []): \Livewire\Features\SupportTesting\Testable
+/**
+ * @param  Closure(): (mixed|array<int, mixed>)  $components
+ */
+function testForm(Closure $components, array $fill = []): Testable
 {
-    FlatpickrTestForm::$field = $field;
-    FlatpickrTestForm::$fill = $fill;
+    PickerTestForm::$components = fn (): array => Arr::wrap($components());
+    PickerTestForm::$fill = $fill;
 
-    return Livewire::test(FlatpickrTestForm::class);
+    return Livewire::test(PickerTestForm::class);
 }
 
 it('renders the field', function () {
-    testForm(fn () => Flatpickr::make('date')->clearable()->presets()->footerActions())
-        ->assertSeeHtml('flatpickrDatepicker(')
-        ->assertSeeHtml('fi-fp-field');
+    testForm(fn () => DatePicker::make('date')->clearable()->presets()->footerActions())
+        ->assertSeeHtml('filamentFlatpickr(')
+        ->assertSeeHtml('fi-fp-field')
+        ->assertSeeHtml('filament-flatpickr.css');
 });
 
-it('fills a stored day and saves it back as the same day', function () {
-    testForm(fn () => Flatpickr::make('date')->timezone('America/New_York'), ['date' => '2024-01-15'])
-        ->assertSet('data.date', '2024-01-15')
+it('fills a stored value in the state format and saves it back', function (Closure $picker, mixed $stored, mixed $state) {
+    testForm($picker, ['date' => $stored])
+        ->assertSet('data.date', $state)
         ->call('save')
         ->assertHasNoErrors()
-        ->assertSet('saved', fn ($saved) => $saved instanceof Carbon && $saved->toDateString() === '2024-01-15');
-});
+        ->assertSet('saved.date', $stored);
+})->with([
+    'a day in a timezone behind the app' => [fn () => DatePicker::make('date')->timezone('America/New_York'), '2024-01-15', '2024-01-15'],
+    'a moment in a timezone behind the app' => [fn () => DateTimePicker::make('date')->timezone('America/New_York'), '2024-01-15 10:00:00', '2024-01-15 05:00:00'],
+    'a time' => [fn () => TimePicker::make('date'), '14:30', '14:30:00'],
+    'a range' => [fn () => DateRangePicker::make('date'), ['2024-01-01', '2024-01-05'], ['2024-01-01', '2024-01-05']],
+    'a month' => [fn () => MonthPicker::make('date')->format('Y-m'), '2024-02', '2024-02-01'],
+    'a day in a format' => [fn () => DatePicker::make('date')->format('d/m/Y'), '15/01/2024', '2024-01-15'],
+]);
 
-it('reports text that is not a date instead of wiping it', function () {
-    testForm(fn () => Flatpickr::make('date')->allowInput())
-        ->set('data.date', 'not a date')
+it('saves what the browser picked', function (Closure $picker, mixed $state, mixed $saved) {
+    testForm($picker)
+        ->set('data.date', $state)
         ->call('save')
-        ->assertHasErrors(['data.date'])
-        ->assertSet('data.date', 'not a date');
+        ->assertHasNoErrors()
+        ->assertSet('saved.date', $saved);
+})->with([
+    'date' => [fn () => DatePicker::make('date'), '2024-01-15', '2024-01-15'],
+    'date and time' => [fn () => DateTimePicker::make('date'), '2024-01-15 14:30:05', '2024-01-15 14:30:05'],
+    'time' => [fn () => TimePicker::make('date'), '14:30:00', '14:30'],
+    'range' => [fn () => DateRangePicker::make('date'), ['2024-01-05', '2024-01-01'], ['2024-01-01', '2024-01-05']],
+    'multiple' => [fn () => MultiDatePicker::make('date'), ['2024-01-01', '2024-03-01'], ['2024-01-01', '2024-03-01']],
+    'month' => [fn () => MonthPicker::make('date'), '2024-02-01', '2024-02-01'],
+    'week' => [fn () => WeekPicker::make('date'), '2024-01-14', '2024-01-14'],
+    'nothing' => [fn () => DatePicker::make('date'), null, null],
+]);
+
+it('gives $get() the value as it is saved', function () {
+    testForm(fn () => [
+        DateTimePicker::make('date')->timezone('America/New_York'),
+        TextInput::make('copy')->dehydrateStateUsing(fn (Get $get): mixed => $get('date')),
+    ])
+        ->set('data.date', '2024-01-15 05:00:00')
+        ->call('save')
+        ->assertSet('saved.copy', '2024-01-15 10:00:00');
 });
 
-it('reports a range with an end that is not a date', function () {
-    testForm(fn () => Flatpickr::make('date')->range())
-        ->set('data.date', ['2024-01-01', 'nope'])
+it('takes $set() and defaults as stored values or date objects', function () {
+    testForm(fn () => DateTimePicker::make('date')->timezone('America/New_York')->default(Carbon::parse('2024-01-15 10:00:00')))
+        ->assertSet('data.date', '2024-01-15 05:00:00');
+});
+
+it('reports a value that is not a date', function (Closure $picker, mixed $state) {
+    testForm($picker)
+        ->set('data.date', $state)
         ->call('save')
         ->assertHasErrors(['data.date']);
-});
+})->with([
+    'text' => [fn () => DatePicker::make('date'), 'not a date'],
+    'a day in another format' => [fn () => DatePicker::make('date'), '15/01/2024'],
+    'a day that does not exist' => [fn () => DatePicker::make('date'), '2024-02-31'],
+    'a time that does not exist' => [fn () => TimePicker::make('date'), '25:00:00'],
+    'a range with an end that is not a date' => [fn () => DateRangePicker::make('date'), ['2024-01-01', 'nope']],
+    'a range of three days' => [fn () => DateRangePicker::make('date'), ['2024-01-01', '2024-01-02', '2024-01-03']],
+    'a list for a single picker' => [fn () => DatePicker::make('date'), ['2024-01-01']],
+]);
 
-it('reports a date the picker rules out', function (Closure $field, mixed $state, ?string $message) {
-    $form = testForm($field)->set('data.date', $state)->call('save');
+it('reports a value the calendar would not let the user pick', function (Closure $picker, mixed $state, ?string $message) {
+    $form = testForm($picker)->set('data.date', $state)->call('save');
 
     $message === null
         ? $form->assertHasNoErrors()
         : expect($form->errors()->first('data.date'))->toContain($message);
 })->with([
-    'on the min date' => [fn () => Flatpickr::make('date')->minDate('2024-01-10'), '2024-01-10', null],
-    'before the min date' => [fn () => Flatpickr::make('date')->minDate('2024-01-10'), '2024-01-09', 'after or equal to 2024-01-10'],
-    'on the max date' => [fn () => Flatpickr::make('date')->maxDate('2024-01-10'), '2024-01-10', null],
-    'after the max date' => [fn () => Flatpickr::make('date')->maxDate('2024-01-10'), '2024-01-11', 'before or equal to 2024-01-10'],
+    'on the min date' => [fn () => DatePicker::make('date')->minDate('2024-01-10'), '2024-01-10', null],
+    'before the min date' => [fn () => DatePicker::make('date')->minDate('2024-01-10'), '2024-01-09', 'after or equal to January 10, 2024'],
+    'on the max date' => [fn () => DatePicker::make('date')->maxDate('2024-01-10 15:00:00'), '2024-01-10', null],
+    'after the max date' => [fn () => DatePicker::make('date')->maxDate('2024-01-10'), '2024-01-11', 'before or equal to January 10, 2024'],
     'a range ending after the max date' => [
-        fn () => Flatpickr::make('date')->range()->maxDate(fn () => Carbon::parse('2024-01-10')),
+        fn () => DateRangePicker::make('date')->maxDate(fn () => Carbon::parse('2024-01-10')),
         ['2024-01-05', '2024-01-12'],
-        'before or equal to 2024-01-10',
+        'before or equal to',
     ],
     'a moment before the min moment' => [
-        fn () => Flatpickr::make('date')->enableTime()->minDate('2024-01-10 12:00:00'),
+        fn () => DateTimePicker::make('date')->minDate('2024-01-10 12:00:00'),
         '2024-01-10 11:59:00',
-        'after or equal to 2024-01-10 12:00:00',
+        'after or equal to January 10, 2024 12:00',
     ],
-    'the month the min date falls in' => [fn () => Flatpickr::make('date')->monthSelect()->minDate('2024-01-15'), '2024-01', null],
-    'a month before the min date' => [fn () => Flatpickr::make('date')->monthSelect()->minDate('2024-01-15'), '2023-12', 'after or equal to 2024-01'],
-    'a picker timezone behind the app' => [
-        fn () => Flatpickr::make('date')->timezone('America/New_York')->minDate('2024-01-10'),
-        '2024-01-10',
-        null,
+    'a moment before the min moment in the picker timezone' => [
+        fn () => DateTimePicker::make('date')->timezone('America/New_York')->minDate('2024-01-10 12:00:00'),
+        '2024-01-10 06:59:00',
+        'after or equal to January 10, 2024 07:00',
     ],
-    'a disabled day' => [fn () => Flatpickr::make('date')->disabledDates(['2024-01-10']), '2024-01-10', 'is invalid'],
+    'the month the min date falls in' => [fn () => MonthPicker::make('date')->minDate('2024-01-15'), '2024-01-01', null],
+    'a month before the min date' => [fn () => MonthPicker::make('date')->minDate('2024-01-15'), '2023-12-01', 'after or equal to January 2024'],
+    'a week the min date falls in' => [fn () => WeekPicker::make('date')->minDate('2024-01-17'), '2024-01-14', null],
+    'a week before the min date' => [fn () => WeekPicker::make('date')->minDate('2024-01-17'), '2024-01-07', 'after or equal to'],
+    'a disabled day' => [fn () => DatePicker::make('date')->disabledDates(['2024-01-10']), '2024-01-10', 'is invalid'],
     'a day in a disabled range' => [
-        fn () => Flatpickr::make('date')->disabledDates([['from' => '2024-01-08', 'to' => '2024-01-12']]),
+        fn () => DatePicker::make('date')->disabledDates([['from' => '2024-01-08', 'to' => '2024-01-12']]),
         '2024-01-11',
         'is invalid',
     ],
     'a day after a disabled range' => [
-        fn () => Flatpickr::make('date')->disabledDates([['from' => '2024-01-08', 'to' => '2024-01-12']]),
+        fn () => DatePicker::make('date')->disabledDates([['from' => '2024-01-08', 'to' => '2024-01-12']]),
         '2024-01-13',
         null,
     ],
-    'a day disabled as a date object in another timezone' => [
-        fn () => Flatpickr::make('date')->timezone('America/New_York')->disabledDates(fn () => [Carbon::parse('2024-01-10')]),
+    'a day disabled as a date object' => [
+        fn () => DatePicker::make('date')->timezone('America/New_York')->disabledDates(fn () => [Carbon::parse('2024-01-10')]),
         '2024-01-10',
         'is invalid',
     ],
-    'a moment on a disabled day' => [
-        fn () => Flatpickr::make('date')->enableTime()->disabledDates(['2024-01-10']),
-        '2024-01-10 09:00:00',
-        'is invalid',
-    ],
+    'a moment on a disabled day' => [fn () => DateTimePicker::make('date')->disabledDates(['2024-01-10']), '2024-01-10 09:00:00', 'is invalid'],
     'a range starting on a disabled day' => [
-        fn () => Flatpickr::make('date')->range()->disabledDates(['2024-01-10']),
+        fn () => DateRangePicker::make('date')->disabledDates(['2024-01-10']),
         ['2024-01-10', '2024-01-12'],
         'is invalid',
     ],
-    'an enabled day' => [fn () => Flatpickr::make('date')->enabledDates(['2024-01-10']), '2024-01-10', null],
-    'a day that is not enabled' => [fn () => Flatpickr::make('date')->enabledDates(fn () => ['2024-01-10']), '2024-01-11', 'is invalid'],
-    'a day in another format that is not enabled' => [
-        fn () => Flatpickr::make('date')->dateFormat('d/m/Y')->enabledDates(['10/01/2024']),
-        '11/01/2024',
-        'is invalid',
-    ],
-    'a day that does not exist' => [fn () => Flatpickr::make('date')->allowInput(), '2024-02-31', 'valid date'],
-    'a month that does not exist' => [fn () => Flatpickr::make('date')->monthSelect(), '2026-13', 'valid date'],
-    'text that is not a time' => [fn () => Flatpickr::make('date')->time()->allowInput(), 'not-a-time', 'valid date'],
-    'a time that does not exist' => [fn () => Flatpickr::make('date')->time()->use24hr(), '25:00', 'valid date'],
-    'a time within minTime and maxTime' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('09:00')->maxTime('17:00'), '09:00', null],
-    'a time before minTime' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('09:00'), '08:59', 'after or equal to 09:00'],
-    'a 12-hour time after maxTime' => [fn () => Flatpickr::make('date')->time()->maxTime('17:00'), '5:30 PM', 'before or equal to 17:00'],
-    'a time in a span over midnight' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('22:00')->maxTime('06:00'), '23:30', null],
-    'a time outside a span over midnight' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('22:00')->maxTime('06:00'), '12:00', 'is invalid'],
+    'an enabled day' => [fn () => DatePicker::make('date')->enabledDates(['2024-01-10']), '2024-01-10', null],
+    'a day that is not enabled' => [fn () => DatePicker::make('date')->enabledDates(fn () => ['2024-01-10']), '2024-01-11', 'is invalid'],
+    'a time within minTime and maxTime' => [fn () => TimePicker::make('date')->minTime('09:00')->maxTime('17:00'), '09:00:00', null],
+    'a time before minTime' => [fn () => TimePicker::make('date')->minTime('09:00'), '08:59:00', 'after or equal to 09:00'],
+    'a time after maxTime' => [fn () => TimePicker::make('date')->maxTime('17:00'), '17:30:00', 'before or equal to 17:00'],
+    'a time in a span over midnight' => [fn () => TimePicker::make('date')->minTime('22:00')->maxTime('06:00'), '23:30:00', null],
+    'a time outside a span over midnight' => [fn () => TimePicker::make('date')->minTime('22:00')->maxTime('06:00'), '12:00:00', 'is invalid'],
     'a moment with a time before minTime' => [
-        fn () => Flatpickr::make('date')->enableTime()->minTime('09:00'),
+        fn () => DateTimePicker::make('date')->minTime('09:00'),
         '2024-01-10 08:00:00',
         'after or equal to 09:00',
     ],
 ]);
 
-it('saves each kind of picker', function (Closure $field, mixed $state, mixed $saved) {
-    testForm($field)
-        ->set('data.date', $state)
-        ->call('save')
-        ->assertHasNoErrors()
-        ->assertSet('saved', function (mixed $value) use ($saved): bool {
-            $normalize = fn (mixed $date): mixed => $date instanceof CarbonInterface ? $date->toDateTimeString() : $date;
-
-            return (is_array($value) ? array_map($normalize, $value) : $normalize($value)) === $saved;
-        });
-})->with([
-    'date' => [fn () => Flatpickr::make('date'), '2024-01-15', '2024-01-15 00:00:00'],
-    'date and time' => [fn () => Flatpickr::make('date')->enableTime(), '2024-01-15 14:30:05', '2024-01-15 14:30:05'],
-    'range' => [fn () => Flatpickr::make('date')->range(), ['2024-01-01', '2024-01-05'], ['2024-01-01 00:00:00', '2024-01-05 00:00:00']],
-    'multiple' => [fn () => Flatpickr::make('date')->multiple(), ['2024-01-01', '2024-03-01'], ['2024-01-01 00:00:00', '2024-03-01 00:00:00']],
-    'month' => [fn () => Flatpickr::make('date')->monthSelect(), '2024-02', '2024-02-01 00:00:00'],
-    'week' => [fn () => Flatpickr::make('date')->weekSelect(), '2024-01-17', '2024-01-17 00:00:00'],
-    'time' => [fn () => Flatpickr::make('date')->time(), '2:30 PM', '14:30'],
-    'time with seconds' => [fn () => Flatpickr::make('date')->time()->use24hr()->enableSeconds(), '14:30:15', '14:30:15'],
-]);
-
 it('requires a range to hold a date', function () {
-    testForm(fn () => Flatpickr::make('date')->range()->required())
+    testForm(fn () => DateRangePicker::make('date')->required())
         ->set('data.date', [])
         ->call('save')
         ->assertHasErrors(['data.date' => 'required']);
 });
 
-it('renders the app locale and translated labels', function () {
+it('sends the locale and translated labels', function () {
     app()->setLocale('ar');
 
-    testForm(fn () => Flatpickr::make('date')->clearable()->footerActions())
-        ->assertSeeHtml("locale: 'ar'")
-        ->assertSeeHtml('aria-label="مسح"');
+    testForm(fn () => DatePicker::make('date')->clearable()->footerActions())
+        ->assertSeeHtml('aria-label="مسح"')
+        ->assertSeeHtml('يناير'); // يناير, January in Arabic, in the locale JSON.
 });
 
-it('hides the clear button on a read-only or disabled field', function (Closure $field) {
-    testForm($field)
+it('hides the clear button on a read-only or disabled field', function (Closure $picker) {
+    testForm($picker)
         ->assertSeeHtml('fi-fp-field')
         ->assertDontSeeHtml('fi-fp-clear-btn');
 })->with([
-    'read-only' => [fn () => Flatpickr::make('date')->clearable()->readOnly()],
-    'disabled' => [fn () => Flatpickr::make('date')->clearable()->disabled()],
+    'read-only' => [fn () => DatePicker::make('date')->clearable()->readOnly()],
+    'disabled' => [fn () => DatePicker::make('date')->clearable()->disabled()],
 ]);
 
-it('links the stylesheet of a flatpickr theme but not of the Filament theme', function () {
-    testForm(fn () => Flatpickr::make('date')->theme(FlatpickrTheme::MATERIAL_BLUE))
-        ->assertSeeHtml('x-ref="themeStylesheet"');
-
-    testForm(fn () => Flatpickr::make('date'))
-        ->assertDontSeeHtml('x-ref="themeStylesheet"');
-});
-
-it('loads the field stylesheet with any theme', function (FlatpickrTheme $theme) {
-    testForm(fn () => Flatpickr::make('date')->theme($theme)->clearable()->presets())
-        ->assertSeeHtml('flatpickr-field-css');
-})->with([FlatpickrTheme::FILAMENT, FlatpickrTheme::MATERIAL_BLUE]);
-
 it('lets a static calendar show and gives an inline one a place under the field', function () {
-    testForm(fn () => Flatpickr::make('date')->static())
+    testForm(fn () => DatePicker::make('date')->static())
         ->assertSeeHtml('fi-fp-field-static')
         ->assertDontSeeHtml('x-ref="inlineCalendar"');
 
-    testForm(fn () => Flatpickr::make('date')->inline())
+    testForm(fn () => DatePicker::make('date')->inline())
         ->assertSeeHtml('x-ref="inlineCalendar"')
         ->assertDontSeeHtml('fi-fp-field-static');
 
-    testForm(fn () => Flatpickr::make('date'))
-        ->assertDontSeeHtml('fi-fp-field-static')
+    testForm(fn () => DatePicker::make('date')->static()->inline())
+        ->assertSeeHtml('fi-fp-field-static')
         ->assertDontSeeHtml('x-ref="inlineCalendar"');
-});
-
-it('accepts an empty optional picker', function () {
-    testForm(fn () => Flatpickr::make('date'))
-        ->set('data.date', null)
-        ->call('save')
-        ->assertHasNoErrors()
-        ->assertSet('saved', null);
-});
-
-it('fills and saves dates when casting state to dates', function () {
-    testForm(
-        fn () => Flatpickr::make('date')->enableTime()->timezone('America/New_York')->castsStateToDates(),
-        ['date' => '2024-01-15 10:00:00'],
-    )
-        ->assertSet('data.date', '2024-01-15 05:00:00')
-        ->call('save')
-        ->assertHasNoErrors()
-        ->assertSet('saved', fn ($saved) => $saved->toDateTimeString() === '2024-01-15 10:00:00');
 });

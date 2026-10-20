@@ -1,59 +1,84 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import l10n from 'flatpickr/dist/esm/l10n/index.js';
-import { formatSelectedDates, isListMode, parseMonthSelectDate } from '../../resources/js/utils/date-helpers.js';
+import arabic from '../../resources/dist/locales/ar.json';
+import french from '../../resources/dist/locales/fr.json';
 import { resolveLocale } from '../../resources/js/utils/locale.js';
 import { resolvePresetDate } from '../../resources/js/utils/presets.js';
+import { datesFromState, isList, startOfWeek } from '../../resources/js/utils/state.js';
+import { createStrictDateParser } from '../../resources/js/utils/strict-parser.js';
 import { local } from './mount.js';
 
 describe('resolveLocale', () => {
+  it('gives English for no locale', () => {
+    expect(resolveLocale(null)).toEqual({});
+  });
+
+  it('turns the day suffixes back into the function flatpickr calls', () => {
+    const locale = resolveLocale(french);
+
+    expect(locale.ordinal(1)).toBe('er');
+    expect(locale.ordinal(2)).toBe('');
+    expect(locale).not.toHaveProperty('ordinals');
+  });
+
+  it('starts the week on the day the field sets', () => {
+    expect(resolveLocale(french, { firstDayOfWeek: 0 }).firstDayOfWeek).toBe(0);
+    expect(resolveLocale(french).firstDayOfWeek).toBe(1);
+  });
+
   it('keeps a right-to-left range readable with a left-to-right mark before the second date', () => {
-    const arabic = resolveLocale('ar');
-
-    expect(arabic.months).toBe(l10n.ar.months);
-    expect(arabic.rangeSeparator).toBe(`${l10n.ar.rangeSeparator}‎`);
-    expect(resolveLocale('fr').rangeSeparator).toBe(l10n.fr.rangeSeparator);
-  });
-
-  it.each([
-    ['ru', 'ru'],
-    ['pt_BR', 'pt'],
-    ['zh-TW', 'zh_tw'],
-    ['zh_CN', 'zh'],
-    ['el', 'gr'],
-    ['vi', 'vn'],
-    ['nb', 'no'],
-    ['xx', 'default'],
-    [null, 'default'],
-  ])('gives flatpickr\'s locale for %s', (locale, expected) => {
-    expect(resolveLocale(locale)).toBe(l10n[expected]);
-  });
-
-  it('uses a locale object as it is', () => {
-    const custom = { firstDayOfWeek: 1 };
-
-    expect(resolveLocale(custom)).toBe(custom);
+    expect(resolveLocale(arabic).rangeSeparator).toBe(`${arabic.rangeSeparator}‎`);
+    expect(resolveLocale(french).rangeSeparator).toBe(french.rangeSeparator);
   });
 });
 
-describe('date helpers', () => {
-  it('writes the state in English whatever the format', () => {
-    const date = new Date(2024, 1, 5, 14, 30);
+describe('strict parser', () => {
+  const parse = createStrictDateParser();
 
-    expect(formatSelectedDates([date], { dateFormat: 'h:i K', isList: false })).toBe('2:30 PM');
-    expect(formatSelectedDates([date], { dateFormat: 'F j, Y', isList: false })).toBe('February 5, 2024');
-    expect(formatSelectedDates([date, date], { dateFormat: 'Y-m-d', isList: true })).toEqual(['2024-02-05', '2024-02-05']);
+  it('gives nothing for a date flatpickr would roll over', () => {
+    expect(parse('31/02/2024', 'd/m/Y')).toBeUndefined();
+    expect(parse('12/31/2024', 'd/m/Y')).toBeUndefined();
+    expect(parse('2024-13-01', 'Y-m-d')).toBeUndefined();
+    expect(parse('2024-01-01 25:00:00', 'Y-m-d H:i:S')).toBeUndefined();
   });
 
-  it('knows which modes hold a list', () => {
-    expect(isListMode('range')).toBe(true);
-    expect(isListMode('multiple')).toBe(true);
-    expect(isListMode('single')).toBe(false);
-    expect(isListMode('time')).toBe(false);
+  it('reads a date without leading zeros or in another letter case', () => {
+    expect(local(parse('5/3/2024', 'd/m/Y'))).toBe('2024-03-05 00:00:00');
+    expect(local(parse('29/02/2024', 'd/m/Y'))).toBe('2024-02-29 00:00:00');
+    expect(local(createStrictDateParser({ noCalendar: true })('2:30 pm', 'h:i K')).slice(11)).toBe('14:30:00');
   });
 
-  it('reads a month as its first day where the user is', () => {
-    expect(local(parseMonthSelectDate('2024-02', 'Y-m'))).toBe('2024-02-01 00:00:00');
-    expect(parseMonthSelectDate('', 'Y-m')).toBeNull();
+  it('reads a date that stops before the time of the format', () => {
+    expect(local(parse('2024-01-15', 'Y-m-d H:i'))).toBe('2024-01-15 00:00:00');
+    expect(parse('2024-02-30', 'Y-m-d H:i')).toBeUndefined();
+  });
+
+  it('reads month names of its locale', () => {
+    expect(local(createStrictDateParser({ l10n: { ...resolveLocale(french) } })('5 février 2024', 'j F Y'))).toBe('2024-02-05 00:00:00');
+  });
+});
+
+describe('state', () => {
+  const parse = createStrictDateParser();
+
+  it('knows which kinds hold a list', () => {
+    expect(isList('range')).toBe(true);
+    expect(isList('multiple')).toBe(true);
+    expect(isList('date')).toBe(false);
+    expect(isList('week')).toBe(false);
+  });
+
+  it('reads the dates of a state, and nothing for an entry that is not one', () => {
+    expect(datesFromState(['2024-01-01', '2024-01-05'], parse, 'Y-m-d').map(local)).toEqual(['2024-01-01 00:00:00', '2024-01-05 00:00:00']);
+    expect(datesFromState(null, parse, 'Y-m-d')).toEqual([]);
+    expect(datesFromState([], parse, 'Y-m-d')).toEqual([]);
+    expect(datesFromState(['2024-01-01', 'nope'], parse, 'Y-m-d')).toBeNull();
+    expect(datesFromState(20240101, parse, 'Y-m-d')).toBeNull();
+  });
+
+  it('finds the first day of a week', () => {
+    expect(local(startOfWeek(new Date(2024, 0, 17, 15, 0), 0))).toBe('2024-01-14 00:00:00');
+    expect(local(startOfWeek(new Date(2024, 0, 17), 1))).toBe('2024-01-15 00:00:00');
+    expect(local(startOfWeek(new Date(2024, 0, 14), 1))).toBe('2024-01-08 00:00:00');
   });
 });
 
@@ -82,10 +107,10 @@ describe('resolvePresetDate', () => {
     expect(local(resolvePresetDate(token, null))).toBe(`${expected} 00:00:00`);
   });
 
-  it('reads a date given in the picker format, and skips one that is not a date', () => {
-    const fp = { config: { dateFormat: 'd/m/Y' } };
+  it('reads a date in the state format, and skips one that is not a date', () => {
+    const fp = { config: { dateFormat: 'Y-m-d' }, parseDate: createStrictDateParser() };
 
-    expect(local(resolvePresetDate('25/12/2024', fp))).toBe('2024-12-25 00:00:00');
+    expect(local(resolvePresetDate('2024-12-25', fp))).toBe('2024-12-25 00:00:00');
     expect(resolvePresetDate('not a date', fp)).toBeNull();
     expect(resolvePresetDate('', fp)).toBeNull();
   });

@@ -1,40 +1,51 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import arabic from '../../resources/dist/locales/ar.json';
+import french from '../../resources/dist/locales/fr.json';
 import { day, local, mount, settle, unmountAll, ymd } from './mount.js';
-
-const twelveHourTime = {
-  packageConfig: { dateFormat: 'h:i K', enableTime: true, noCalendar: true, time_24hr: false },
-  attribs: { mode: 'time' },
-};
-
-const range = { packageConfig: { mode: 'range' }, attribs: { mode: 'range' } };
 
 const button = (component, selector) => component.fp.calendarContainer.querySelector(selector);
 
 const todayButton = (component) => button(component, '.fi-fp-footer-btn-primary');
+
+/**
+ * Text typed in the field, read as flatpickr reads it when the field loses focus.
+ */
+const type = (component, text) => component.fp.setDate(text, true, component.fp.config.altFormat);
+
+/**
+ * A day clicked in the calendar: flatpickr shows its month, then picks it.
+ */
+const pick = (component, date) => {
+  component.fp.jumpToDate(date);
+  component.fp.setDate(date, true);
+};
 
 afterEach(() => {
   unmountAll();
 });
 
 describe('state', () => {
-  it('shows the state it starts with', () => {
+  it('shows the state it starts with in the display format', () => {
     const component = mount({ state: '2024-01-15' });
 
     expect(local(component.fp.selectedDates[0])).toBe('2024-01-15 00:00:00');
+    expect(component.fp.altInput.value).toBe('January 15, 2024');
   });
 
-  it('writes a picked date to the state in the state format', () => {
-    const component = mount({ locale: 'ar' });
+  it('writes a picked date in the state format whatever the locale', () => {
+    const component = mount({ locale: arabic, config: { altFormat: 'j F Y' } });
 
-    component.fp.setDate(new Date(2024, 0, 15), true);
+    component.fp.setDate(new Date(2024, 1, 5), true);
 
-    expect(component.state).toBe('2024-01-15');
+    expect(component.state).toBe('2024-02-05');
+    expect(component.fp.altInput.value).toBe('5 فبراير 2024');
   });
 
-  it('keeps a 12-hour PM time in a locale with its own AM/PM', async () => {
-    const component = mount({ ...twelveHourTime, state: '2:30 PM', locale: 'ar' });
+  it('keeps a PM time on a 12-hour clock in a locale with its own AM/PM', async () => {
+    const component = mount({ kind: 'time', state: '14:30:00', locale: arabic, config: { altFormat: 'h:i K', time_24hr: false } });
 
     expect(component.fp.selectedDates[0].getHours()).toBe(14);
+    expect(component.fp.altInput.value).toBe('2:30 م');
 
     const picked = new Date();
 
@@ -42,26 +53,39 @@ describe('state', () => {
     component.fp.setDate(picked, true);
     await settle();
 
-    expect(component.state).toBe('3:45 PM');
-    expect(component.fp.selectedDates[0].getHours()).toBe(15);
+    expect(component.state).toBe('15:45:00');
+  });
 
-    component.state = '2:30 PM';
-    await settle();
+  it('reads text typed in the display format and locale', () => {
+    const component = mount({ locale: arabic, config: { altFormat: 'j F Y', allowInput: true } });
 
-    expect(component.fp.selectedDates[0].getHours()).toBe(14);
+    type(component, '5 فبراير 2024');
+
+    expect(component.state).toBe('2024-02-05');
+  });
+
+  it('reads typed month names in its own locale beside a picker in another', () => {
+    const component = mount({ locale: arabic, config: { altFormat: 'j F Y', allowInput: true } });
+
+    // The last picker created fills flatpickr's shared table of month names with French.
+    mount({ locale: french, config: { altFormat: 'j F Y', allowInput: true } });
+
+    type(component, '5 فبراير 2024');
+
+    expect(component.state).toBe('2024-02-05');
   });
 
   it('does not turn a typed day that does not exist into another day', () => {
-    const component = mount({ packageConfig: { dateFormat: 'd/m/Y', allowInput: true } });
+    const component = mount({ config: { altFormat: 'd/m/Y', allowInput: true } });
 
-    component.fp.setDate('31/02/2024', true);
+    type(component, '31/02/2024');
 
     expect(component.fp.selectedDates).toEqual([]);
     expect(component.state).toBeNull();
 
-    component.fp.setDate('29/2/2024', true);
+    type(component, '29/2/2024');
 
-    expect(component.state).toBe('29/02/2024');
+    expect(component.state).toBe('2024-02-29');
   });
 
   it('follows the state when the server changes it', async () => {
@@ -76,10 +100,22 @@ describe('state', () => {
     await settle();
 
     expect(component.fp.selectedDates).toHaveLength(0);
+    expect(component.fp.altInput.value).toBe('');
+  });
+
+  it('shows nothing for a state that is not in the state format', async () => {
+    const component = mount({ state: '15/01/2024' });
+
+    expect(component.fp.selectedDates).toHaveLength(0);
+
+    component.state = '2024-02-31';
+    await settle();
+
+    expect(component.fp.selectedDates).toHaveLength(0);
   });
 
   it('does not read back the state it wrote itself', async () => {
-    const component = mount({ packageConfig: { dateFormat: 'Y-m-d H:i:S', enableTime: true } });
+    const component = mount({ kind: 'datetime', config: { enableSeconds: true } });
     const setDate = component.fp.setDate;
     let readBack = 0;
 
@@ -97,7 +133,7 @@ describe('state', () => {
   });
 
   it('reads and writes a range as a list', async () => {
-    const component = mount({ ...range, state: ['2024-01-01', '2024-01-05'] });
+    const component = mount({ kind: 'range', state: ['2024-01-01', '2024-01-05'] });
 
     expect(component.fp.selectedDates.map(local)).toEqual(['2024-01-01 00:00:00', '2024-01-05 00:00:00']);
 
@@ -108,10 +144,41 @@ describe('state', () => {
     expect(component.fp.selectedDates).toHaveLength(2);
   });
 
-  it('reads a month as the first of that month where the user is', () => {
-    const component = mount({ state: '2024-02', packageConfig: { dateFormat: 'Y-m', altFormat: 'F Y' }, attribs: { monthSelect: true } });
+  it('keeps an Arabic range readable', () => {
+    const component = mount({ kind: 'range', locale: arabic, config: { altFormat: 'Y-m-d' }, state: ['2024-01-01', '2024-01-05'] });
+
+    // The mark is the first strong character before the second date, so its digits stay left to right.
+    expect(component.fp.altInput.value).toBe('2024-01-01 إلى ‎2024-01-05');
+  });
+
+  it('reads and writes a month as its first day', async () => {
+    const component = mount({ kind: 'month', state: '2024-02-01' });
 
     expect(local(component.fp.selectedDates[0])).toBe('2024-02-01 00:00:00');
+    expect(component.fp.altInput.value).toBe('February 2024');
+
+    component.fp.setDate(new Date(2024, 2, 1), true);
+    await settle();
+
+    expect(component.state).toBe('2024-03-01');
+  });
+
+  it('writes a week as its first day and shows its middle', async () => {
+    for (const [firstDayOfWeek, start, middle] of [[0, '2024-01-14', '2024-01-17'], [1, '2024-01-15', '2024-01-18']]) {
+      const component = mount({ kind: 'week', firstDayOfWeek });
+
+      pick(component, new Date(2024, 0, 20));
+      await settle();
+
+      expect(component.state).toBe(start);
+      expect(ymd(component.fp.selectedDates[0])).toBe(middle);
+      expect(component.fp.altInput.value).toBe('Week 3, 2024');
+    }
+  });
+
+  it('shows a week the server set on a day the limits allow', () => {
+    expect(ymd(mount({ kind: 'week', state: '2024-01-14' }).fp.selectedDates[0])).toBe('2024-01-17');
+    expect(ymd(mount({ kind: 'week', state: '2024-01-14', config: { minDate: '2024-01-19' } }).fp.selectedDates[0])).toBe('2024-01-19');
   });
 
   it('empties the state when cleared', async () => {
@@ -121,13 +188,14 @@ describe('state', () => {
     await settle();
 
     expect(component.state).toBeNull();
+    expect(component.hasValue).toBe(false);
     expect(component.fp.selectedDates).toHaveLength(0);
   });
 });
 
 describe('Today', () => {
   it('picks the start of today for a picker without a time', async () => {
-    const component = mount({ attribs: { todayButton: true } });
+    const component = mount({ footerActions: { today: 'Today' } });
 
     todayButton(component).click();
     await settle();
@@ -136,9 +204,21 @@ describe('Today', () => {
     expect(local(component.fp.selectedDates[0])).toBe(`${ymd(day())} 00:00:00`);
   });
 
+  it('picks this month for a month picker and a range of today for a range picker', async () => {
+    const month = mount({ kind: 'month', footerActions: { today: 'Today' } });
+    const range = mount({ kind: 'range', footerActions: { today: 'Today' } });
+
+    todayButton(month).click();
+    todayButton(range).click();
+    await settle();
+
+    expect(month.state).toBe(`${ymd(day()).slice(0, 7)}-01`);
+    expect(range.state).toEqual([ymd(day()), ymd(day())]);
+  });
+
   it('can not pick today when it is disabled, even with a time', async () => {
-    for (const packageConfig of [{ disable: [ymd(day())] }, { disable: [ymd(day())], enableTime: true, dateFormat: 'Y-m-d H:i:S' }]) {
-      const component = mount({ packageConfig, attribs: { todayButton: true } });
+    for (const kind of ['date', 'datetime']) {
+      const component = mount({ kind, config: { disable: [ymd(day())] }, footerActions: { today: 'Today' } });
 
       expect(todayButton(component).disabled).toBe(true);
 
@@ -151,9 +231,11 @@ describe('Today', () => {
   });
 
   it('can not pick today before minDate or after maxDate', () => {
-    expect(todayButton(mount({ packageConfig: { minDate: ymd(day(5)) }, attribs: { todayButton: true } })).disabled).toBe(true);
-    expect(todayButton(mount({ packageConfig: { maxDate: ymd(day(-5)) }, attribs: { todayButton: true } })).disabled).toBe(true);
-    expect(todayButton(mount({ packageConfig: { minDate: ymd(day()) }, attribs: { todayButton: true } })).disabled).toBe(false);
+    const footerActions = { today: 'Today' };
+
+    expect(todayButton(mount({ config: { minDate: ymd(day(5)) }, footerActions })).disabled).toBe(true);
+    expect(todayButton(mount({ config: { maxDate: ymd(day(-5)) }, footerActions })).disabled).toBe(true);
+    expect(todayButton(mount({ config: { minDate: ymd(day()) }, footerActions })).disabled).toBe(false);
   });
 });
 
@@ -161,7 +243,7 @@ describe('presets', () => {
   const lastSevenDays = { label: 'Last 7 days', start: 'last_7_days', end: 'today' };
 
   it('sets the state', () => {
-    const component = mount({ attribs: { presets: [{ label: 'Launch', date: '2024-12-25' }] } });
+    const component = mount({ presets: [{ label: 'Launch', date: '2024-12-25' }] });
     const preset = button(component, '.fi-fp-preset-btn');
 
     expect(preset.textContent).toBe('Launch');
@@ -172,7 +254,7 @@ describe('presets', () => {
   });
 
   it('starts a range on minDate when it would start before it', () => {
-    const component = mount({ ...range, packageConfig: { ...range.packageConfig, minDate: ymd(day(-3)) }, attribs: { ...range.attribs, presets: [lastSevenDays] } });
+    const component = mount({ kind: 'range', config: { minDate: ymd(day(-3)) }, presets: [lastSevenDays] });
 
     button(component, '.fi-fp-preset-btn').click();
 
@@ -181,9 +263,9 @@ describe('presets', () => {
 
   it('can not pick a preset the limits rule out', () => {
     const component = mount({
-      ...range,
-      packageConfig: { ...range.packageConfig, minDate: ymd(day(1)) },
-      attribs: { ...range.attribs, presets: [lastSevenDays, { label: 'Next week', start: 'tomorrow', end: 'in_7_days' }] },
+      kind: 'range',
+      config: { minDate: ymd(day(1)) },
+      presets: [lastSevenDays, { label: 'Next week', start: 'tomorrow', end: 'in_7_days' }],
     });
 
     const [past, future] = component.fp.calendarContainer.querySelectorAll('.fi-fp-preset-btn');
@@ -197,7 +279,7 @@ describe('presets', () => {
   });
 
   it('stops highlighting a preset once the dates change another way', () => {
-    const component = mount({ attribs: { presets: [{ label: 'Today', date: 'today' }] } });
+    const component = mount({ presets: [{ label: 'Today', date: 'today' }] });
     const preset = button(component, '.fi-fp-preset-btn');
 
     preset.click();
@@ -216,22 +298,23 @@ describe('presets', () => {
 });
 
 describe('calendar', () => {
-  it('marks the calendar for the Filament theme only', () => {
+  it('marks the calendar for the Filament theme', () => {
     expect(mount().fp.calendarContainer.classList.contains('fi-fp-calendar')).toBe(true);
-    expect(mount({ attribs: { nativeTheme: false } }).fp.calendarContainer.classList.contains('fi-fp-calendar')).toBe(false);
   });
 
   it('draws an inline calendar under the field', () => {
-    const component = mount({ packageConfig: { inline: true } });
+    const component = mount({ config: { inline: true } });
 
     expect(component.fp.calendarContainer.parentElement).toBe(component.$refs.inlineCalendar);
   });
 
+  it('starts the week on the day the field sets', () => {
+    expect(mount({ locale: arabic }).fp.l10n.firstDayOfWeek).toBe(arabic.firstDayOfWeek ?? 0);
+    expect(mount({ locale: arabic, firstDayOfWeek: 1 }).fp.l10n.firstDayOfWeek).toBe(1);
+  });
+
   it('adds footer buttons with their labels', async () => {
-    const component = mount({
-      state: '2024-01-15',
-      attribs: { todayButton: true, clearButton: true, applyButton: true, labels: { today: 'اليوم', clear: 'مسح', apply: 'تطبيق' } },
-    });
+    const component = mount({ state: '2024-01-15', footerActions: { today: 'اليوم', clear: 'مسح', apply: 'تطبيق' } });
 
     const labels = [...component.fp.calendarContainer.querySelectorAll('.fi-fp-footer-btn')].map((item) => item.textContent);
 
@@ -246,41 +329,7 @@ describe('calendar', () => {
   it('turns off browser autofill on the field', () => {
     const component = mount();
 
-    expect(component.fp.input.getAttribute('autocomplete')).toBe('off');
-    expect(component.fp.input.getAttribute('data-1p-ignore')).toBe('true');
-  });
-});
-
-describe('dark mode', () => {
-  it('swaps a flatpickr theme to its dark stylesheet and back', async () => {
-    const link = document.createElement('link');
-
-    link.setAttribute('href', 'light.css');
-
-    const component = mount({
-      attribs: { nativeTheme: false, themeAsset: 'light.css', darkThemeAsset: 'dark.css' },
-      themeStylesheet: link,
-    });
-
-    document.documentElement.classList.add('dark');
-    await settle();
-
-    expect(component.mode).toBe('dark');
-    expect(link.getAttribute('href')).toBe('dark.css');
-
-    document.documentElement.classList.remove('dark');
-    await settle();
-
-    expect(link.getAttribute('href')).toBe('light.css');
-  });
-
-  it('stops following the page once destroyed', async () => {
-    const component = mount();
-
-    component.destroy();
-    document.documentElement.classList.add('dark');
-    await settle();
-
-    expect(component.mode).toBe('light');
+    expect(component.fp.altInput.getAttribute('autocomplete')).toBe('off');
+    expect(component.fp.altInput.getAttribute('data-1p-ignore')).toBe('true');
   });
 });

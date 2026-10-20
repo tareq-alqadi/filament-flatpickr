@@ -1,5 +1,4 @@
 import { ensureCalendarMainWrapper } from './calendar-layout.js';
-import { parseStateDate } from './state-dates.js';
 
 const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -12,7 +11,7 @@ const addDays = (date, days) => {
 };
 
 /**
- * Turns a preset token, or a date in the picker's format, into a local Date. A day such as "2024-12-25" is read where
+ * Turns a preset token, or a date in the state format, into a local Date. A day such as "2024-12-25" is read where
  * the user is: `new Date()` would read it as midnight UTC, which is the day before west of UTC.
  */
 export function resolvePresetDate(value, fp) {
@@ -62,17 +61,11 @@ export function resolvePresetDate(value, fp) {
   }
 }
 
-// A preset date given in code comes in the state's format, which is English whatever the picker's locale.
+// The server sends a preset date given in code in the state format.
 function parsePresetDate(value, fp) {
-  const parsed = fp ? parseStateDate(value, fp.config.dateFormat, fp.config) : null;
+  const parsed = fp?.parseDate(value, fp.config.dateFormat);
 
-  if (parsed) {
-    return parsed;
-  }
-
-  const fallback = new Date(value);
-
-  return Number.isNaN(fallback.getTime()) ? null : fallback;
+  return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
 }
 
 /**
@@ -115,7 +108,7 @@ export function resolvePresetDates(preset, fp) {
  * Adds a sidebar of quick date shortcuts to the calendar.
  */
 export function attachPresets(fp, component) {
-  const presets = component.attribs.presets ?? [];
+  const presets = component.presets ?? [];
 
   if (!presets.length || !fp.calendarContainer) {
     return;
@@ -160,12 +153,11 @@ export function attachPresets(fp, component) {
       isApplyingPreset = true;
 
       try {
+        fp.jumpToDate(dates[0]);
         fp.setDate(dates, true);
       } finally {
         isApplyingPreset = false;
       }
-
-      fp.jumpToDate(dates[0]);
       highlight(button);
 
       if (fp.config.closeOnSelect) {
