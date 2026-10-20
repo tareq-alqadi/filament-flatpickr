@@ -1,67 +1,76 @@
 import MonthSelect from 'flatpickr/dist/esm/plugins/monthSelect';
 import WeekSelect from 'flatpickr/dist/esm/plugins/weekSelect/weekSelect';
-import { chainHook } from './chain-hook.js';
-import { attachFooterActions } from './footer-actions.js';
+import { browserHintsPlugin } from '../plugins/browser-hints.js';
+import { followFieldPlugin } from '../plugins/follow-field.js';
+import { footerActionsPlugin } from '../plugins/footer-actions.js';
+import { presetsPlugin } from '../plugins/presets.js';
+import { textDeletedPlugin } from '../plugins/text-deleted.js';
 import { resolveLocale } from './locale.js';
-import { attachPresets } from './presets.js';
-import { startOfWeek, stateFromDates, weekAnchor } from './state.js';
+import { datesFromState, sameDates, stateFromDates } from './state.js';
 import { createStrictDateParser } from './strict-parser.js';
 
 /**
- * The options flatpickr is created with: the field's, and the hooks that keep the state in step with the calendar.
+ * The options flatpickr is created with: the field's, which the server sends as JSON, the plugins for what the field
+ * adds to the calendar, and the hook that writes the picked dates to the state.
  */
-export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, modalReposition }) {
-  const { kind } = component;
-  const l10n = resolveLocale(component.config.locale ?? locale, { firstDayOfWeek });
+export function buildFlatpickrConfig(component, { locale, firstDayOfWeek }) {
+  const { kind, config: options } = component;
+  const l10n = resolveLocale(options.locale ?? locale, { firstDayOfWeek });
 
-  const config = {
-    ...component.config,
-    locale: l10n,
-    // Text typed in the field, or a date the server sends, is read in the field's locale without rolling over: a
-    // typed "31/02/2024" is no date, as the server says, instead of 2 March.
-    parseDate: createStrictDateParser({ l10n, noCalendar: component.config.noCalendar }),
-    plugins: [],
-    onChange: (selectedDates, _dateStr, instance) => {
-      // A week shows its middle day, so its number is the same whichever day was clicked.
-      if (kind === 'week' && selectedDates.length) {
-        const anchor = weekAnchor(startOfWeek(selectedDates[0], instance.l10n.firstDayOfWeek), instance);
-
-        if (anchor.getTime() !== selectedDates[0].getTime()) {
-          instance.setDate(anchor, false);
-        }
-      }
-
-      component.state = stateFromDates(instance.selectedDates, instance, kind);
-    },
-  };
+  // In the order their hooks run. The month and week plugins draw the calendar the others add to.
+  const plugins = [];
 
   if (kind === 'month') {
-    config.plugins.push(new MonthSelect({
-      shorthand: false,
-      dateFormat: config.dateFormat,
-      altFormat: config.altFormat,
-      theme: 'filament',
-    }));
+    plugins.push(new MonthSelect({ shorthand: false, dateFormat: options.dateFormat, altFormat: options.altFormat, theme: 'filament' }));
   }
 
   if (kind === 'week') {
-    config.plugins.push(new WeekSelect());
+    plugins.push(new WeekSelect());
   }
 
-  // Filament clips the field (.fi-fo-text-input { overflow: hidden }), so an inline calendar goes under it.
-  if (config.inline && !config.static && component.$refs.inlineCalendar) {
-    config.appendTo = component.$refs.inlineCalendar;
+  plugins.push(
+    browserHintsPlugin({ allowTyping: options.allowInput === true && !component.$refs.input.hasAttribute('readonly') }),
+    textDeletedPlugin(() => {
+      component.state = null;
+    }),
+  );
+
+  if (!options.static && !options.inline) {
+    plugins.push(followFieldPlugin());
   }
 
-  config.onOpen = modalReposition.createOnOpenHook(config.onOpen);
-  config.onClose = modalReposition.createOnCloseHook(config.onClose);
+  if (component.presets?.length) {
+    plugins.push(presetsPlugin(component.presets));
+  }
 
-  config.onReady = chainHook(config.onReady, (_selectedDates, _dateStr, instance) => {
-    instance.calendarContainer?.classList.add('fi-fp-calendar');
+  if (Object.values(component.footerActions ?? {}).some(Boolean)) {
+    plugins.push(footerActionsPlugin(component.footerActions, kind));
+  }
 
-    attachPresets(instance, component);
-    attachFooterActions(instance, component);
-  });
+  return {
+    ...options,
+    locale: l10n,
+    // Text typed in the field, or a date the server sends, is read in the field's locale without rolling over: a
+    // typed "31/02/2024" is no date, as the server says, instead of 2 March.
+    parseDate: createStrictDateParser({ l10n, noCalendar: options.noCalendar }),
+    // Flatpickr runs the hooks of the last plugin first.
+    plugins: plugins.reverse(),
+    // Filament clips the field (.fi-fo-text-input { overflow: hidden }), so an inline calendar goes under it.
+    appendTo: options.inline && !options.static ? component.$refs.inlineCalendar : undefined,
+    onReady: (_selectedDates, _dateStr, fp) => {
+      fp.calendarContainer.classList.add('fi-fp-calendar');
+    },
+    onChange: (selectedDates, _dateStr, fp) => {
+      const state = stateFromDates(selectedDates, fp, kind);
+      const dates = datesFromState(state, fp, kind);
 
-  return config;
+      // The calendar shows the state as it reads back: a week its middle day, so its number is the same whichever day
+      // was clicked.
+      if (dates?.length && !sameDates(dates, selectedDates)) {
+        fp.setDate(dates, false);
+      }
+
+      component.state = state;
+    },
+  };
 }

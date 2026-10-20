@@ -1,3 +1,5 @@
+import { addDays, isDate, startOfWeek } from './dates.js';
+
 /**
  * Whether the picker holds a list of dates: a range or several dates.
  */
@@ -6,25 +8,11 @@ export function isList(kind) {
 }
 
 /**
- * The first day of the week a date is in, as the calendar's rows show it.
- */
-export function startOfWeek(date, firstDayOfWeek = 0) {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  start.setDate(start.getDate() - ((start.getDay() - firstDayOfWeek + 7) % 7));
-
-  return start;
-}
-
-/**
  * The day a week picker selects for the week starting on a date: its middle, so the week number shown is the same
  * whichever day was clicked, or else the first day of it the limits allow.
  */
 export function weekAnchor(start, fp) {
-  const day = (offset) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset);
-  const candidates = [3, 0, 1, 2, 4, 5, 6].map(day);
-
-  return candidates.find((date) => fp.isEnabled(date)) ?? start;
+  return [3, 0, 1, 2, 4, 5, 6].map((offset) => addDays(start, offset)).find((date) => fp.isEnabled(date)) ?? start;
 }
 
 /**
@@ -46,15 +34,27 @@ export function stateFromDates(dates, fp, kind) {
 }
 
 /**
- * The dates of a state: none for an empty one, or null when an entry isn't a date in the state format.
+ * The dates the calendar selects for a state: none for an empty one, or null when an entry isn't a date in the state
+ * format. A week selects its anchor.
  */
-export function datesFromState(state, parse, format) {
+export function datesFromState(state, fp, kind) {
   if (state === null || state === undefined || state === '' || (Array.isArray(state) && !state.length)) {
     return [];
   }
 
   const dates = (Array.isArray(state) ? state : [state])
-    .map((value) => (typeof value === 'string' ? parse(value, format) : undefined));
+    .map((value) => (typeof value === 'string' ? fp.parseDate(value, fp.config.dateFormat) : undefined));
 
-  return dates.every((date) => date instanceof Date && !Number.isNaN(date.getTime())) ? dates : null;
+  if (!dates.every(isDate)) {
+    return null;
+  }
+
+  return kind === 'week' ? [weekAnchor(startOfWeek(dates[0], fp.l10n.firstDayOfWeek), fp)] : dates;
+}
+
+/**
+ * Whether two lists of dates are the same moments.
+ */
+export function sameDates(first, second) {
+  return first.length === second.length && first.every((date, index) => date.getTime() === second[index].getTime());
 }

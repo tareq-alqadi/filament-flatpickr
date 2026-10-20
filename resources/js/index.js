@@ -1,12 +1,11 @@
 import flatpickr from 'flatpickr';
 import { buildFlatpickrConfig } from './utils/build-config.js';
-import { disableBrowserHints } from './utils/disable-hints.js';
-import { ModalReposition } from './utils/modal-reposition.js';
-import { datesFromState, startOfWeek, stateFromDates, weekAnchor } from './utils/state.js';
+import { datesFromState, stateFromDates } from './utils/state.js';
 
 /**
  * The Alpine component of a picker. `state` is entangled with Livewire and holds text in the state format (see
- * PickerKind::stateFormat()), which the calendar shows in the display format.
+ * PickerKind::stateFormat()), which the calendar shows in the display format. What the field adds to the calendar is
+ * in its flatpickr plugins (see buildFlatpickrConfig()).
  */
 export default function filamentFlatpickr({
   state,
@@ -17,10 +16,6 @@ export default function filamentFlatpickr({
   presets = [],
   footerActions = {},
 }) {
-  let modalReposition = null;
-  let input = null;
-  let onEmptied = null;
-
   return {
     state,
     kind,
@@ -61,43 +56,17 @@ export default function filamentFlatpickr({
         return;
       }
 
-      const dates = datesFromState(value, (text, format) => this.fp.parseDate(text, format), this.fp.config.dateFormat);
+      const dates = datesFromState(value, this.fp, this.kind);
 
-      if (!dates?.length) {
+      if (dates?.length) {
+        this.fp.setDate(dates, false);
+      } else {
         this.fp.clear(false);
-
-        return;
       }
-
-      this.fp.setDate(
-        this.kind === 'week' ? [weekAnchor(startOfWeek(dates[0], this.fp.l10n.firstDayOfWeek), this.fp)] : dates,
-        false,
-      );
     },
 
     init() {
-      modalReposition = new ModalReposition();
-
-      const options = buildFlatpickrConfig(this, { locale, firstDayOfWeek, modalReposition });
-      const allowTyping = options.allowInput === true && !this.$refs.input.hasAttribute('readonly');
-
-      this.fp = flatpickr(this.$refs.input, options);
-      disableBrowserHints(this.fp, { allowTyping });
-
-      if (!this.fp.config.static && !this.fp.config.inline) {
-        modalReposition.attach(this.fp);
-      }
-
-      // Text deleted from a field the user can type in empties the state.
-      input = this.fp.altInput ?? this.$refs.input;
-      onEmptied = () => {
-        if (!input.value?.trim()) {
-          this.state = null;
-        }
-      };
-
-      input.addEventListener('input', onEmptied);
-      input.addEventListener('blur', onEmptied);
+      this.fp = flatpickr(this.$refs.input, buildFlatpickrConfig(this, { locale, firstDayOfWeek }));
 
       this.showState(this.state);
 
@@ -105,14 +74,6 @@ export default function filamentFlatpickr({
     },
 
     destroy() {
-      input?.removeEventListener('input', onEmptied);
-      input?.removeEventListener('blur', onEmptied);
-      input = null;
-      onEmptied = null;
-
-      modalReposition?.detach();
-      modalReposition = null;
-
       this.fp?.destroy();
       this.fp = null;
     },

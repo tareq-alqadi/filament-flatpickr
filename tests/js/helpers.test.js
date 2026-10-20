@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import arabic from '../../resources/dist/locales/ar.json';
 import french from '../../resources/dist/locales/fr.json';
 import { resolveLocale } from '../../resources/js/utils/locale.js';
-import { resolvePresetDate } from '../../resources/js/utils/presets.js';
-import { datesFromState, isList, startOfWeek } from '../../resources/js/utils/state.js';
+import { resolvePresetDate } from '../../resources/js/plugins/presets.js';
+import { startOfWeek } from '../../resources/js/utils/dates.js';
+import { datesFromState, isList } from '../../resources/js/utils/state.js';
 import { createStrictDateParser } from '../../resources/js/utils/strict-parser.js';
 import { local } from './mount.js';
 
@@ -58,7 +59,12 @@ describe('strict parser', () => {
 });
 
 describe('state', () => {
-  const parse = createStrictDateParser();
+  const fp = {
+    config: { dateFormat: 'Y-m-d' },
+    l10n: { firstDayOfWeek: 0 },
+    parseDate: createStrictDateParser(),
+    isEnabled: (date) => date.getDate() !== 17,
+  };
 
   it('knows which kinds hold a list', () => {
     expect(isList('range')).toBe(true);
@@ -68,11 +74,17 @@ describe('state', () => {
   });
 
   it('reads the dates of a state, and nothing for an entry that is not one', () => {
-    expect(datesFromState(['2024-01-01', '2024-01-05'], parse, 'Y-m-d').map(local)).toEqual(['2024-01-01 00:00:00', '2024-01-05 00:00:00']);
-    expect(datesFromState(null, parse, 'Y-m-d')).toEqual([]);
-    expect(datesFromState([], parse, 'Y-m-d')).toEqual([]);
-    expect(datesFromState(['2024-01-01', 'nope'], parse, 'Y-m-d')).toBeNull();
-    expect(datesFromState(20240101, parse, 'Y-m-d')).toBeNull();
+    expect(datesFromState(['2024-01-01', '2024-01-05'], fp, 'range').map(local)).toEqual(['2024-01-01 00:00:00', '2024-01-05 00:00:00']);
+    expect(datesFromState(null, fp, 'date')).toEqual([]);
+    expect(datesFromState([], fp, 'range')).toEqual([]);
+    expect(datesFromState(['2024-01-01', 'nope'], fp, 'range')).toBeNull();
+    expect(datesFromState(20240101, fp, 'date')).toBeNull();
+  });
+
+  it('selects the middle of a week, or the first day of it the limits allow', () => {
+    expect(datesFromState('2024-01-07', fp, 'week').map(local)).toEqual(['2024-01-10 00:00:00']);
+    // 17 January, the middle of the week starting on the 14th, is disabled.
+    expect(datesFromState('2024-01-14', fp, 'week').map(local)).toEqual(['2024-01-14 00:00:00']);
   });
 
   it('finds the first day of a week', () => {

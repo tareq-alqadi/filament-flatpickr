@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import arabic from '../../resources/dist/locales/ar.json';
 import french from '../../resources/dist/locales/fr.json';
 import { day, local, mount, settle, unmountAll, ymd } from './mount.js';
@@ -331,5 +331,80 @@ describe('calendar', () => {
 
     expect(component.fp.altInput.getAttribute('autocomplete')).toBe('off');
     expect(component.fp.altInput.getAttribute('data-1p-ignore')).toBe('true');
+  });
+
+  it('draws the footer of a month picker under its months', () => {
+    const component = mount({ kind: 'month', footerActions: { today: 'Today' } });
+    const main = component.fp.calendarContainer.querySelector(':scope > .fi-fp-main');
+
+    expect(main.querySelector('.flatpickr-monthSelect-months')).not.toBeNull();
+    expect(main.lastElementChild.classList.contains('fi-fp-footer')).toBe(true);
+  });
+});
+
+describe('field', () => {
+  it('empties the state when its text is deleted', () => {
+    const component = mount({ state: '2024-01-15', config: { allowInput: true } });
+
+    component.fp.altInput.value = '';
+    component.fp.altInput.dispatchEvent(new Event('input'));
+
+    expect(component.state).toBeNull();
+  });
+
+  describe('an open calendar', () => {
+    let top;
+
+    const open = (options) => {
+      const component = mount(options);
+
+      vi.spyOn(component.fp.altInput, 'getBoundingClientRect').mockImplementation(() => ({ top, left: 0, width: 200, height: 40 }));
+      component.fp.open();
+
+      return Object.assign(component, { place: vi.spyOn(component.fp, '_positionCalendar') });
+    };
+
+    beforeEach(() => {
+      top = 100;
+      vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('follows its field when the field moves, as in a modal that scrolls', () => {
+      const component = open();
+
+      vi.advanceTimersToNextFrame();
+      expect(component.place).not.toHaveBeenCalled();
+
+      top = 60;
+      vi.advanceTimersToNextFrame();
+      expect(component.place).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersToNextFrame();
+      expect(component.place).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops following when it closes or the field is removed', () => {
+      const closed = open();
+      const removed = open();
+
+      closed.fp.close();
+      removed.destroy();
+      top = 60;
+      vi.advanceTimersToNextFrame();
+
+      expect(closed.place).not.toHaveBeenCalled();
+      expect(removed.place).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('stays where flatpickr puts an inline or static calendar', () => {
+      open({ config: { static: true } });
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });
