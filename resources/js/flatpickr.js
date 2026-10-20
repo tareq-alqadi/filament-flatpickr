@@ -1,16 +1,9 @@
 import flatpickr from 'flatpickr';
-import 'flatpickr/dist/l10n/ar';
 import { buildFlatpickrConfig } from './utils/build-config.js';
 import { disableBrowserHints } from './utils/disable-hints.js';
 import { parseMonthSelectDate } from './utils/date-helpers.js';
 import { ModalReposition } from './utils/modal-reposition.js';
-import {
-  applyDarkTheme,
-  createThemeChangeHandler,
-  isDarkMode,
-  resolveInitialMode,
-  resolveThemeMode,
-} from './utils/theme.js';
+import { applyThemeMode, currentThemeMode, isDarkMode, watchThemeMode } from './utils/theme.js';
 
 export default function flatpickrDatepicker({
   state,
@@ -19,9 +12,10 @@ export default function flatpickrDatepicker({
   locale,
 }) {
   let modalReposition = null;
-  let onThemeChanged = null;
+  let themeObserver = null;
   let onInput = null;
   let onBlur = null;
+  let input = null;
 
   return {
     state,
@@ -36,7 +30,7 @@ export default function flatpickrDatepicker({
     },
 
     get themeMode() {
-      return resolveThemeMode(this.mode);
+      return this.mode;
     },
 
     get isMonthSelect() {
@@ -77,11 +71,11 @@ export default function flatpickrDatepicker({
     },
 
     init() {
-      this.mode = resolveInitialMode();
+      this.mode = currentThemeMode();
       modalReposition = new ModalReposition();
 
       const config = buildFlatpickrConfig(this, modalReposition);
-      const allowTyping = this.packageConfig.allowInput === true && !this.$refs.picker.hasAttribute('readonly');
+      const allowTyping = config.allowInput === true && !this.$refs.picker.hasAttribute('readonly');
       this.fp = flatpickr(this.$refs.picker, config);
       disableBrowserHints(this.fp, { allowTyping });
 
@@ -89,7 +83,7 @@ export default function flatpickrDatepicker({
         modalReposition.attach(this.fp);
       }
 
-      const input = this.inputElement();
+      input = this.inputElement();
 
       onInput = () => {
         if (!input.value?.trim()) {
@@ -106,14 +100,10 @@ export default function flatpickrDatepicker({
       input.addEventListener('input', onInput);
       input.addEventListener('blur', onBlur);
 
-      this.$nextTick(() => {
-        applyDarkTheme(this);
-      });
+      applyThemeMode(this);
+      themeObserver = watchThemeMode(this);
 
       this.setFlatpickrDate(this.state);
-
-      onThemeChanged = createThemeChangeHandler(this);
-      window.addEventListener('theme-changed', onThemeChanged);
 
       this.$watch('state', (value) => {
         this.setFlatpickrDate(value ?? null);
@@ -121,20 +111,17 @@ export default function flatpickrDatepicker({
     },
 
     destroy() {
-      const input = this.inputElement();
-
       if (input) {
         input.removeEventListener('input', onInput);
         input.removeEventListener('blur', onBlur);
       }
 
+      input = null;
       onInput = null;
       onBlur = null;
 
-      if (onThemeChanged) {
-        window.removeEventListener('theme-changed', onThemeChanged);
-        onThemeChanged = null;
-      }
+      themeObserver?.disconnect();
+      themeObserver = null;
 
       modalReposition?.detach();
       modalReposition = null;

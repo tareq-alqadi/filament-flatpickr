@@ -9,20 +9,27 @@ const HINT_ATTRIBUTES = {
   'data-form-type': 'other',
 };
 
+/**
+ * Marks an input so browsers and password managers don't offer to fill it. An attribute the field already has, such
+ * as one set with autocapitalize(), is kept.
+ */
 function mark(input) {
   if (!input) {
     return;
   }
 
   Object.entries(HINT_ATTRIBUTES).forEach(([name, value]) => {
-    input.setAttribute(name, value);
+    if (!input.hasAttribute(name)) {
+      input.setAttribute(name, value);
+    }
   });
 }
 
 /**
  * Stops the browser autofill menu (saved names, emails, and so on) from opening over the calendar.
  * Chrome ignores autocomplete="off" on a focused editable field, so a field the user can type in is
- * read-only for the moment it receives focus, which is when the menu is decided.
+ * read-only for the moment it receives focus, which is when the menu is decided. That is skipped on
+ * touch screens, where a field that is read-only when focused doesn't open the keyboard.
  */
 export function disableBrowserHints(fp, { allowTyping = false } = {}) {
   if (!fp) {
@@ -34,7 +41,7 @@ export function disableBrowserHints(fp, { allowTyping = false } = {}) {
 
   const field = fp.altInput ?? fp.input;
 
-  if (!field || !allowTyping) {
+  if (!field || !allowTyping || !window.matchMedia?.('(pointer: fine)').matches) {
     return;
   }
 

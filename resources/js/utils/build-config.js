@@ -1,22 +1,25 @@
 import MonthSelect from 'flatpickr/dist/esm/plugins/monthSelect';
 import WeekSelect from 'flatpickr/dist/esm/plugins/weekSelect/weekSelect';
 import { chainHook } from './chain-hook.js';
-import { formatSelectedDates, getMonthSelectDefaultDate } from './date-helpers.js';
+import { formatSelectedDates, getMonthSelectDefaultDate, isListMode } from './date-helpers.js';
 import { attachFooterActions } from './footer-actions.js';
+import { resolveLocale } from './locale.js';
 import { attachPresets } from './presets.js';
+import { usesNativeTheme } from './theme.js';
 
 export function buildFlatpickrConfig(component, modalReposition) {
   const { attribs, packageConfig, locale } = component;
 
   const config = {
-    mode: attribs.mode,
+    mode: 'single',
     time_24hr: true,
     altFormat: 'F j, Y',
     disableMobile: true,
     allowInvalidPreload: false,
     static: false,
-    locale,
     ...packageConfig,
+    // A locale from customConfig() wins over the app's.
+    locale: resolveLocale(packageConfig.locale ?? locale),
     plugins: [],
     onChange: (selectedDates) => {
       if (!selectedDates?.length) {
@@ -27,8 +30,7 @@ export function buildFlatpickrConfig(component, modalReposition) {
 
       component.state = formatSelectedDates(selectedDates, {
         dateFormat: packageConfig.dateFormat,
-        isRangePicker: attribs.rangePicker === true,
-        isMultipleMode: attribs.mode === 'multiple',
+        isList: isListMode(attribs.mode),
       });
     },
   };
@@ -38,9 +40,7 @@ export function buildFlatpickrConfig(component, modalReposition) {
       new MonthSelect({
         shorthand: false,
         dateFormat: packageConfig.dateFormat,
-        altInput: true,
         altFormat: packageConfig.altFormat || 'F Y',
-        altInputClass: packageConfig.altInputClass,
         theme: component.mode,
       }),
     );
@@ -58,6 +58,11 @@ export function buildFlatpickrConfig(component, modalReposition) {
   config.onClose = modalReposition.createOnCloseHook(config.onClose);
 
   config.onReady = chainHook(config.onReady, (_selectedDates, _dateStr, instance) => {
+    // The Filament theme's rules only style calendars of this field, so another theme on the page keeps its look.
+    if (usesNativeTheme(component)) {
+      instance.calendarContainer?.classList.add('fi-fp-calendar');
+    }
+
     attachPresets(instance, component);
     attachFooterActions(instance, component);
   });

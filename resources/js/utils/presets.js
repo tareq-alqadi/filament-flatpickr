@@ -11,11 +11,16 @@ const addDays = (date, days) => {
 };
 
 /**
- * Turns a preset token or an explicit date into a Date relative to today.
+ * Turns a preset token, or a date in the picker's format, into a local Date. A day such as "2024-12-25" is read where
+ * the user is: `new Date()` would read it as midnight UTC, which is the day before west of UTC.
  */
-export function resolvePresetDate(value) {
+export function resolvePresetDate(value, fp) {
   if (value instanceof Date) {
     return value;
+  }
+
+  if (value === null || value === undefined || value === '') {
+    return null;
   }
 
   const today = startOfDay(new Date());
@@ -48,8 +53,22 @@ export function resolvePresetDate(value) {
     case 'end_of_year':
       return new Date(today.getFullYear(), 11, 31);
     default:
-      return new Date(value);
+      return parsePresetDate(value, fp);
   }
+}
+
+function parsePresetDate(value, fp) {
+  const isValid = (date) => date instanceof Date && !Number.isNaN(date.getTime());
+
+  const parsed = fp?.parseDate(String(value), fp.config.dateFormat);
+
+  if (isValid(parsed)) {
+    return parsed;
+  }
+
+  const fallback = new Date(value);
+
+  return isValid(fallback) ? fallback : null;
 }
 
 /**
@@ -84,11 +103,17 @@ export function attachPresets(fp, component) {
       event.preventDefault();
       event.stopPropagation();
 
-      const dates = preset.date
-        ? [resolvePresetDate(preset.date)]
-        : [resolvePresetDate(preset.start), resolvePresetDate(preset.end)];
+      const dates = (
+        preset.date
+          ? [resolvePresetDate(preset.date, fp)]
+          : [resolvePresetDate(preset.start, fp), resolvePresetDate(preset.end, fp)]
+      ).filter(Boolean);
 
-      fp.setDate(dates.filter((date) => !Number.isNaN(date.getTime())), true);
+      if (!dates.length) {
+        return;
+      }
+
+      fp.setDate(dates, true);
       fp.jumpToDate(dates[0]);
 
       sidebar.querySelectorAll('.fi-fp-preset-btn').forEach((item) => {

@@ -20,21 +20,25 @@
     ];
 
     $usesNativeTheme = $usesNativeTheme();
+    $themeAsset = $getThemeAsset();
+    $isReadOnly = $isReadOnly();
+    $locale = app()->getLocale();
 
     if ($isMonthSelect()) {
         $stylesheetHrefs[] = \Filament\Support\Facades\FilamentAsset::getStyleHref('month-select-style', $packageName);
     }
 
     if ($usesNativeTheme) {
-        $stylesheetHrefs[] = $getThemeAsset();
+        $stylesheetHrefs[] = $themeAsset;
     }
 
-    $isClearable = $isClearable() && ! $isDisabled && ! $isReadOnly();
+    $isClearable = $isClearable() && ! $isDisabled && ! $isReadOnly;
+    $isClickable = ! $isAllowInput() && ! $isDisabled && ! $isReadOnly;
 
     $attribs = [
         'disabled' => $isDisabled,
-        'theme' => $getTheme() == 'default' ? 'default' : $getTheme(),
-        'themeAsset' => $getThemeAsset(),
+        'theme' => $getTheme(),
+        'themeAsset' => $themeAsset,
         'lightThemeAsset' => $getLightThemeAsset(),
         'darkThemeAsset' => $getDarkThemeAsset(),
         'nativeTheme' => $usesNativeTheme,
@@ -48,6 +52,9 @@
         'applyButton' => $hasApplyButton(),
         'labels' => $getActionLabels(),
     ];
+
+    // The picker is drawn once (wire:ignore), so anything it is built from remounts it when it changes.
+    $pickerKey = substr(md5(serialize([$config, $attribs, $isReadOnly, $isClearable, $locale])), 0, 64);
 @endphp
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     <div
@@ -55,10 +62,10 @@
                 state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$statePath}')") }},
                 packageConfig: @js($config),
                 attribs: @js($attribs),
-                locale: '{{ app()->getLocale() }}'
+                locale: @js($locale),
             })"
         wire:ignore
-        wire:key="{{ $livewireKey }}.{{ substr(md5(serialize([$getDisabledDates(), $isDisabled, $isReadOnly(), $getMinDate(), $getMaxDate(), $getMode(), $isRangePicker(), $isMonthSelect()])), 0, 64) }}"
+        wire:key="{{ $livewireKey }}.{{ $pickerKey }}"
         x-ignore
         x-load
         x-load-css="@js($stylesheetHrefs)"
@@ -67,7 +74,7 @@
             <link
                 x-ref="themeStylesheet"
                 rel="stylesheet"
-                href="{{ $getThemeAsset() }}"
+                href="{{ $themeAsset }}"
             />
         @endunless
         <x-filament::input.wrapper :disabled="$isDisabled" :inline-prefix="$isPrefixInline" :inline-suffix="$isSuffixInline" :prefix="$prefixLabel"
@@ -75,6 +82,7 @@
             :valid="!$errors->has($statePath)" @class([
                 'fi-fo-text-input fi-fp-field',
                 'fi-fp-field-clearable' => $isClearable,
+                'fi-fp-field-clickable' => $isClickable,
             ]) :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class(array_filter([
                 'overflow-hidden' => ! $isStatic(),
             ]))">
@@ -93,8 +101,7 @@
                         'inlineSuffix' =>
                             $isSuffixInline && (count($suffixActions) || $suffixIcon || filled($suffixLabel)),
                         'placeholder' => $getPlaceholder(),
-                        'class' => $isAllowInput() ? null : 'cursor-pointer',
-                        'readonly' => $isReadOnly(),
+                        'readonly' => $isReadOnly,
                         'required' => $isRequired() && !$isConcealed,
                         'type' => 'text',
                     ],

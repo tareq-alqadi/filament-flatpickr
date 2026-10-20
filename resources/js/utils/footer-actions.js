@@ -47,7 +47,7 @@ export function attachFooterActions(fp, component) {
   if (todayButton) {
     addButton(labels.today ?? 'Today', 'fi-fp-footer-btn-primary', () => {
       const today = new Date();
-      const dates = component.attribs.rangePicker === true ? [today, today] : [today];
+      const dates = component.attribs.mode === 'range' ? [today, today] : [today];
 
       fp.setDate(dates, true);
       fp.jumpToDate(today);

@@ -1,18 +1,12 @@
 {
+    "private": true,
     "type": "module",
     "scripts": {
-        "dev:scripts": "node bin/build.js --dev",
-        "build:scripts": "node bin/build.js",
-        "dev": "npm-run-all --parallel dev:*",
-        "build": "npm-run-all build:*"
+        "dev": "node bin/build.js --dev",
+        "build": "node bin/build.js"
     },
-
     "devDependencies": {
-        "esbuild": "^0.18.17",
+        "esbuild": "^0.28.2",
         "flatpickr": "^4.6.13"
-    },
-    "dependencies": {
-        "date-fns": "^3.3.1",
-        "moment": "^2.30.1"
     }
 }
