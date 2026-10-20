@@ -2,17 +2,20 @@
 
 namespace TareqAlqadi\FilamentFlatpickr\Forms\Components;
 
+use BackedEnum;
 use Carbon\CarbonInterface;
 use Carbon\Exceptions\InvalidFormatException;
 use Closure;
+use DateTimeInterface;
 use Filament\Forms\Components\Concerns;
 use Filament\Forms\Components\Contracts;
 use Filament\Forms\Components\Field;
 use Filament\Schemas\Components\StateCasts\Contracts\StateCast;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
@@ -26,13 +29,23 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     use Concerns\CanBeAutocompleted;
     use Concerns\CanBeLengthConstrained;
     use Concerns\CanBeReadOnly;
-    use Concerns\HasAffixes;
+    use Concerns\HasAffixes {
+        prefixIcon as protected setAffixPrefixIcon;
+        getPrefixIcon as protected getAffixPrefixIcon;
+    }
     use Concerns\HasExtraInputAttributes;
     use Concerns\HasInputMode;
     use Concerns\HasPlaceholder;
     use HasExtraAlpineAttributes;
 
-    const PACKAGE_NAME = 'tareq-alqadi/filament-flatpickr';
+    /**
+     * Flatpickr format tokens and the PHP date format characters that write and read the same thing.
+     */
+    protected const PHP_FORMAT_TOKENS = [
+        'd' => 'd', 'D' => 'D', 'l' => 'l', 'j' => 'j', 'J' => 'jS', 'w' => 'w', 'W' => 'W',
+        'F' => 'F', 'm' => 'm', 'n' => 'n', 'M' => 'M', 'U' => 'U', 'y' => 'y', 'Y' => 'Y', 'Z' => 'c',
+        'H' => 'H', 'h' => 'g', 'G' => 'h', 'i' => 'i', 'S' => 's', 's' => 's', 'K' => 'A',
+    ];
 
     protected string $view = 'tareq-alqadi-filament-flatpickr::forms.components.flatpickr';
 
@@ -52,17 +65,26 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected bool $altInput = false;
 
-    protected array $config = [];
+    protected array|Closure $config = [];
 
-    protected ?string $altFormat = 'F j, Y';
+    /**
+     * The display format the user set; null uses the default for the kind of picker.
+     */
+    protected ?string $altFormat = null;
 
     protected bool $enableTime = false;
 
-    protected ?string $dateFormat = 'Y-m-d';
+    /**
+     * The state format the user set; null uses the default for the kind of picker.
+     */
+    protected ?string $dateFormat = null;
 
     protected FlatpickrTheme $theme = FlatpickrTheme::DEFAULT;
 
-    protected ?string $altInputClass = 'fi-input';
+    /**
+     * Empty, so flatpickr gives the visible input the classes of the field's own input.
+     */
+    protected ?string $altInputClass = '';
 
     protected bool $allowInput = false;
 
@@ -84,7 +106,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected ?array $enabledDates = null;
 
-    protected bool $disableMobile = false;
+    protected bool $disableMobile = true;
 
     protected bool $enableSeconds = false;
 
@@ -140,78 +162,46 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected bool|Closure $showApplyButton = false;
 
+    protected bool $hasCustomPrefixIcon = false;
+
+    /**
+     * The options flatpickr is created with. Reading it changes nothing, so it can be called any number of times.
+     */
     public function getConfig(): array
     {
-        if ($this->isEnableTime()) {
-            if (!Str::of($this->getDateFormat())->contains('H', ignoreCase: true)) {
-                $this->dateFormat('Y-m-d H:i:s');
-            }
-            if (!Str::of($this->getAltFormat())->contains('H', ignoreCase: true)) {
-                $this->altFormat('F j, Y H:i K');
-            }
-        }
-        if ($this->isRangePicker()) {
-            $this->mode(FlatpickrMode::RANGE);
-        } elseif ($this->isMultiplePicker()) {
-            $this->mode(FlatpickrMode::MULTIPLE);
-        } elseif ($this->isTime()) {
-            $this->mode(FlatpickrMode::TIME);
-            $this->noCalendar();
-            $this->enableTime();
-            if (Str::of($this->getDateFormat())->contains('Y')) {
-                $this->dateFormat($this->isUse24hr() ? 'H:i' : 'h:i K');
-            }
-        } elseif ($this->isMonthSelect()) {
-            $this->mode(FlatpickrMode::SINGLE);
-            $this->enableTime(false);
-            $this->time(false);
-            $this->range(false);
-            $this->timezone('UTC');
-            $this->dateFormat('Y-m');
-            $this->altFormat('F Y');
-            $this->altInput();
-        } elseif ($this->isWeekSelect()) {
-            $this->mode(FlatpickrMode::SINGLE);
-            $this->enableTime(false);
-            $this->time(false);
-            $this->range(false);
-            // The state keeps the day picked, so the week's year isn't lost; the picker shows its week number.
-            $this->dateFormat('Y-m-d');
-            $this->altFormat('\Week W');
-            $this->altInput();
-        }
+        $isReadOnly = $this->isReadOnly();
 
         $config = [
-            'monthSelect' => $this->monthSelect,
-            'weekSelect' => $this->weekSelect,
-            'mode' => $this->mode->value,
-            'altInput' => $this->altInput,
-            'altFormat' => $this->altFormat,
-            'enableTime' => $this->enableTime,
-            'dateFormat' => $this->dateFormat,
-            'theme' => $this->theme->value,
+            'monthSelect' => $this->isMonthSelect(),
+            'weekSelect' => $this->isWeekSelect(),
+            'mode' => $this->getFlatpickrMode(),
+            'altInput' => $this->isAltInput(),
+            'altFormat' => $this->getAltFormat(),
+            'enableTime' => $this->isEnableTime(),
+            'dateFormat' => $this->getDateFormat(),
+            'theme' => $this->getTheme(),
             'altInputClass' => $this->getAltInputClass(),
-            'allowInput' => $this->allowInput,
+            'allowInput' => $this->isAllowInput() && ! $isReadOnly,
             'allowInvalidPreload' => $this->allowInvalidPreload,
             'ariaDateFormat' => $this->ariaDateFormat,
             'conjunction' => $this->conjunction,
-            'clickOpens' => $this->clickOpens,
+            'clickOpens' => $this->isClickOpens() && ! $isReadOnly,
             'defaultHour' => $this->defaultHour,
             'defaultMinute' => $this->defaultMinute,
             'defaultSeconds' => $this->defaultSeconds,
-            'disable' => $this->disabledDates,
+            'disable' => $this->serializeDates($this->getDisabledDates()),
             'disableMobile' => $this->disableMobile,
             'enableSeconds' => $this->enableSeconds,
             'hourIncrement' => $this->hourIncrement,
             'minuteIncrement' => $this->minuteIncrement,
             'inline' => $this->inline,
-            'minDate' => $this->minDate,
-            'maxDate' => $this->maxDate,
+            'minDate' => $this->serializeDate($this->getMinDate()),
+            'maxDate' => $this->serializeDate($this->getMaxDate()),
             'minTime' => $this->minTime,
             'maxTime' => $this->maxTime,
             'nextArrow' => $this->nextArrow,
             'prevArrow' => $this->prevArrow,
-            'noCalendar' => $this->noCalendar,
+            'noCalendar' => $this->isNoCalendar(),
             'shorthandCurrentMonth' => $this->shorthandCurrentMonth,
             'time_24hr' => $this->use24hr,
             'weekNumbers' => $this->weekNumbers,
@@ -223,8 +213,9 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             'closeOnSelect' => $this->closeOnSelect,
             'static' => $this->isStatic(),
         ];
-        if ($this->getEnabledDates()) {
-            $config['enabled'] = $this->getEnabledDates();
+
+        if (filled($enabledDates = $this->getEnabledDates())) {
+            $config['enable'] = $this->serializeDates($enabledDates);
         }
 
         return $config;
@@ -232,107 +223,73 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function isTime(): bool
     {
-        return $this->time;
+        return $this->time || $this->mode === FlatpickrMode::TIME;
     }
 
     public function time(bool $time = true): static
     {
-        $this->prefixIcon('heroicon-o-clock');
         $this->time = $time;
 
         return $this;
     }
 
+    public function prefixIcon(string | BackedEnum | Htmlable | Closure | null $icon, bool | Closure $isInline = false): static
+    {
+        $this->hasCustomPrefixIcon = true;
+
+        return $this->setAffixPrefixIcon($icon, $isInline);
+    }
+
+    /**
+     * A calendar, or a clock for a time picker, unless an icon was set.
+     */
+    public function getPrefixIcon(): string | BackedEnum | Htmlable | null
+    {
+        if ($this->hasCustomPrefixIcon) {
+            return $this->getAffixPrefixIcon();
+        }
+
+        return $this->isTime() ? 'heroicon-o-clock' : 'heroicon-o-calendar-days';
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
-        $this->prefixIcon('heroicon-o-calendar-days');
 
         $this->autocomplete(false);
 
         $this->prevArrow(svg('heroicon-m-chevron-left')->toHtml());
         $this->nextArrow(svg('heroicon-m-chevron-right')->toHtml());
 
-        $this->theme(config('tareq-alqadi-filament-flatpickr.default_theme', FlatpickrTheme::FILAMENT));
+        $this->theme(config('tareq-alqadi-filament-flatpickr.default_theme') ?? FlatpickrTheme::FILAMENT);
 
         $this->dehydrateStateUsing(static function (Flatpickr $component, $state) {
             return static::dehydratePickerState($component, $state);
         });
 
+        // Text that isn't a date is kept for validation, so the rule below reports it instead of the field emptying.
         $this->mutateStateForValidationUsing(static function (Flatpickr $component, $state) {
-            return static::dehydratePickerState($component, $state);
+            if (blank($state) || $component->isTime()) {
+                return $state;
+            }
+
+            return static::dehydratePickerState($component, $state) ?? $state;
         });
 
-        $this->formatStateUsing(function (mixed $state, Flatpickr $component) {
-            // The state cast turns the date back into what the picker shows when the state is set.
+        $this->rule(static fn (Flatpickr $component): Closure => static function (string $attribute, mixed $value, Closure $fail) use ($component): void {
+            if ($component->hasInvalidState()) {
+                $fail('validation.date')->translate();
+            }
+        });
+
+        // A stored value, in the app's timezone, becomes the text the picker shows. With castsStateToDates() the state
+        // cast has done this already while the form was filled.
+        $this->formatStateUsing(static function (Flatpickr $component, mixed $state) {
             if ($component->shouldCastStateToDates()) {
                 return $state;
             }
 
-            if ($state instanceof CarbonInterface) {
-                $state = (string) $state;
-            }
-
-            if (blank($state)) {
-                return;
-            }
-
-            // Range and multiple pickers hold a list: each date is shown the way the state cast shows it.
-            if (is_array($state)) {
-                return (new FlatpickrStateCast($component))->set($state);
-            }
-
-            if ($component->isTime()) {
-                return $state;
-            }
-
-            // Ensure config is set (this sets dateFormat to 'Y-m' for month select)
-            $component->getConfig();
-
-            if ($component->isMonthSelect()) {
-                // Parse the state (could be ISO datetime, Y-m string, Carbon instance, etc.)
-                if (!$state instanceof CarbonInterface) {
-                    try {
-                        // First try with the exact month format 'Y-m'
-                        $parsed = Carbon::createFromFormat($component->getDateFormat(), $state);
-                    } catch (InvalidFormatException $exception) {
-                        try {
-                            // Parse ISO datetime or any other format (from JavaScript)
-                            $parsed = Carbon::parse($state);
-                        } catch (InvalidFormatException $exception) {
-                            return null;
-                        }
-                    }
-                } else {
-                    $parsed = $state;
-                }
-
-                // Format as 'Y-m' (e.g., "2024-01") - this is what JavaScript expects
-                return $parsed
-                    ->setTimezone(config('app.timezone'))
-                    ->startOfMonth()
-                    ->format($component->getDateFormat()); // Returns 'Y-m' format (e.g., "2024-01")
-            }
-
-            if (blank($state)) {
-                return null;
-            }
-
-            if (!$state instanceof CarbonInterface) {
-                try {
-                    $state = Carbon::createFromFormat($component->getDateFormat(), (string) $state);
-                } catch (InvalidFormatException $exception) {
-                    try {
-                        $state = Carbon::parse($state);
-                    } catch (InvalidFormatException $exception) {
-                        return null;
-                    }
-                }
-
-                $state = $state->setTimezone($component->getTimezone());
-            }
-
-            return $state->format($component->getDateFormat());
+            return $component->formatStateForPicker($state);
         });
     }
 
@@ -374,8 +331,73 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
      */
     public function parseState(mixed $state): CarbonInterface|array|string|null
     {
-        $this->getConfig();
+        return $this->parseEach($state, fn (mixed $date): ?CarbonInterface => $this->parseDate($date));
+    }
 
+    /**
+     * Reads a stored value, such as a model attribute or a default, in the app's timezone, the way parseState() reads
+     * what the picker shows.
+     *
+     * @return CarbonInterface|array<int, CarbonInterface>|string|null
+     */
+    public function parseStoredState(mixed $state): CarbonInterface|array|string|null
+    {
+        return $this->parseEach($state, fn (mixed $date): ?CarbonInterface => $this->parseStoredDate($date));
+    }
+
+    /**
+     * The text the picker shows for a stored value, a date given in code or text typed in it. Text that isn't a date
+     * is kept as it is, so validation reports it instead of the field emptying while the user types.
+     *
+     * @return string|array<int, string>|null
+     */
+    public function formatStateForPicker(mixed $state): string|array|null
+    {
+        if (blank($state)) {
+            return null;
+        }
+
+        if ($this->isTime()) {
+            return $this->formatTime($state, $this->getPhpDateFormat());
+        }
+
+        $parsed = $this->parseStoredState($state);
+
+        return match (true) {
+            $parsed instanceof CarbonInterface => $this->formatDate($parsed),
+            is_array($parsed) && filled($parsed) => array_map(fn (CarbonInterface $date): string => $this->formatDate($date), $parsed),
+            is_string($state) => $state,
+            default => null,
+        };
+    }
+
+    /**
+     * Whether the field holds something that isn't a date: text typed in the picker, or a range or list with an entry
+     * that isn't one.
+     */
+    public function hasInvalidState(): bool
+    {
+        $state = $this->getRawState();
+
+        if (blank($state) || $this->isTime()) {
+            return false;
+        }
+
+        if ($this->isRangePicker() || $this->isMultiplePicker()) {
+            return collect(Arr::wrap($state))
+                ->filter(fn (mixed $date): bool => filled($date))
+                ->contains(fn (mixed $date): bool => $this->parseDate($date) === null);
+        }
+
+        return $this->parseDate($state) === null;
+    }
+
+    /**
+     * @param  Closure(mixed): ?CarbonInterface  $parse
+     * @return CarbonInterface|array<int, CarbonInterface>|string|null
+     */
+    protected function parseEach(mixed $state, Closure $parse): CarbonInterface|array|string|null
+    {
         if (blank($state)) {
             return null;
         }
@@ -384,65 +406,142 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             return $state;
         }
 
-        if ($this->isMonthSelect()) {
-            return $this->parseDate($state)?->startOfMonth();
-        }
+        $parseOne = function (mixed $date) use ($parse): ?CarbonInterface {
+            $parsed = $parse($date);
 
-        if (in_array($this->getMode(), [FlatpickrMode::RANGE->value, FlatpickrMode::MULTIPLE->value], true)) {
-            return collect($state)
-                ->map(fn (mixed $date): ?CarbonInterface => $this->parseDate($date))
+            return $this->isMonthSelect() ? $parsed?->startOfMonth() : $parsed;
+        };
+
+        if ($this->isRangePicker() || $this->isMultiplePicker()) {
+            return collect(Arr::wrap($state))
+                ->map($parseOne)
                 ->filter()
                 ->values()
                 ->all();
         }
 
-        return $this->parseDate($state);
+        // A single picker given a list, such as after its mode changed, reads the first entry.
+        if (is_array($state)) {
+            $state = Arr::first($state);
+        }
+
+        return $parseOne($state);
     }
 
     /**
-     * One date in the picker's format and timezone. A date given in code, or a value as stored in any format Carbon
-     * reads, is a moment for a picker with a time, shown in the picker's timezone, and otherwise the calendar day it
-     * falls on, in the app's timezone for a serialized value (a stored day comes back as "…T21:00:00Z" in a timezone
-     * ahead of UTC).
+     * One date as the picker shows it: in the picker's format and timezone. A date given in code, or text in another
+     * format Carbon reads, is a moment for a picker with a time, and otherwise the calendar day it falls on in the app's
+     * timezone.
      */
     protected function parseDate(mixed $date): ?CarbonInterface
     {
-        if (!$date instanceof CarbonInterface) {
-            try {
-                return Carbon::createFromFormat('!'.$this->getDateFormat(), (string) $date, $this->getTimezone());
-            } catch (InvalidFormatException) {
-                try {
-                    $date = Carbon::parse((string) $date, config('app.timezone'))->setTimezone(config('app.timezone'));
-                } catch (InvalidFormatException) {
-                    return null;
-                }
-            }
+        if ($date instanceof DateTimeInterface) {
+            return $this->toPickerTimezone(Carbon::instance($date));
         }
 
-        return $this->isEnableTime()
-            ? $date->avoidMutation()->setTimezone($this->getTimezone())
-            : $date->avoidMutation()->startOfDay()->shiftTimezone($this->getTimezone());
+        if (! is_scalar($date) || blank($date)) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('!'.$this->getPhpDateFormat(), (string) $date, $this->getTimezone());
+        } catch (InvalidFormatException) {
+            return $this->parseInAppTimezone((string) $date);
+        }
     }
 
-    public static function dehydratePickerState($component, $state)
+    /**
+     * One stored date. A value in the ISO form databases and models give, like "2024-01-15", "2024-01-15 10:00:00" or
+     * "2024-01-14T21:00:00.000000Z", is read in the app's timezone; anything else is read the way the picker shows it.
+     */
+    protected function parseStoredDate(mixed $date): ?CarbonInterface
     {
-        $component->getConfig();
+        if ($date instanceof DateTimeInterface) {
+            return $this->toPickerTimezone(Carbon::instance($date));
+        }
 
+        if (! is_scalar($date) || blank($date)) {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{1,2}(-\d{1,2})?([ T]|$)/', (string) $date)) {
+            return $this->parseInAppTimezone((string) $date);
+        }
+
+        return $this->parseDate($date);
+    }
+
+    protected function parseInAppTimezone(string $date): ?CarbonInterface
+    {
+        try {
+            $parsed = Carbon::parse($date, config('app.timezone'))->setTimezone(config('app.timezone'));
+        } catch (InvalidFormatException) {
+            return null;
+        }
+
+        return $this->toPickerTimezone($parsed);
+    }
+
+    /**
+     * A date with a time is the same moment in the picker's timezone. A date without one is a calendar day: the day it
+     * falls on where it was given, at the start of that day in the picker's timezone.
+     */
+    protected function toPickerTimezone(CarbonInterface $date): CarbonInterface
+    {
+        $date = $date->avoidMutation();
+
+        return $this->isEnableTime()
+            ? $date->setTimezone($this->getTimezone())
+            : $date->startOfDay()->shiftTimezone($this->getTimezone());
+    }
+
+    protected function formatDate(CarbonInterface $date): string
+    {
+        return $date->format($this->getPhpDateFormat());
+    }
+
+    /**
+     * A time from the picker, a stored time or a date, in a PHP format, or the value as it is when it isn't a time.
+     */
+    protected function formatTime(mixed $time, string $format): mixed
+    {
+        if ($time instanceof DateTimeInterface) {
+            return $time->format($format);
+        }
+
+        if (! is_scalar($time)) {
+            return $time;
+        }
+
+        try {
+            return Carbon::createFromFormat('!'.$this->getPhpDateFormat(), (string) $time)->format($format);
+        } catch (InvalidFormatException) {
+            try {
+                return Carbon::parse((string) $time)->format($format);
+            } catch (InvalidFormatException) {
+                return $time;
+            }
+        }
+    }
+
+    /**
+     * The value saved for the picker's state. Dates go to the app's timezone, and a month is its first day. A time is
+     * saved as "H:i", or "H:i:s" with seconds, whatever the picker shows. A value that isn't a date gives null.
+     */
+    public static function dehydratePickerState(Flatpickr $component, mixed $state): mixed
+    {
         if (blank($state)) {
             return null;
         }
 
-        if ($component->getMode() === FlatpickrMode::TIME->value) {
-            return $state;
+        if ($component->isTime()) {
+            return $component->formatTime($state, $component->isEnableSeconds() ? 'H:i:s' : 'H:i');
         }
 
-        // Dates given by the state cast are parsed already; they still go to the app's timezone. A month is its first day.
         $parsed = $component->parseState($state);
 
         if (blank($parsed)) {
-            $component->state(null);
-
-            return;
+            return null;
         }
 
         return is_array($parsed)
@@ -456,9 +555,73 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
      */
     protected static function toAppTimezone(Flatpickr $component, CarbonInterface $date): CarbonInterface
     {
+        $date = $date->avoidMutation();
+
         return $component->isEnableTime()
             ? $date->setTimezone(config('app.timezone'))
             : $date->shiftTimezone(config('app.timezone'));
+    }
+
+    /**
+     * A date given in code as text flatpickr reads with the picker's format; text is sent as it is.
+     */
+    protected function serializeDate(mixed $date): mixed
+    {
+        if ($date instanceof DateTimeInterface) {
+            return $this->formatDate($this->toPickerTimezone(Carbon::instance($date)));
+        }
+
+        return $date;
+    }
+
+    /**
+     * Dates and `['from' => ..., 'to' => ...]` ranges, for flatpickr's `disable` and `enable` options.
+     */
+    protected function serializeDates(array $dates): array
+    {
+        return array_map(
+            fn (mixed $date): mixed => is_array($date) ? array_map($this->serializeDate(...), $date) : $this->serializeDate($date),
+            $dates,
+        );
+    }
+
+    /**
+     * A flatpickr format as the PHP date format that writes and reads the same text. Characters that aren't format
+     * tokens are escaped, and so is anything escaped with a backslash.
+     */
+    public static function convertFormatToPhp(string $format): string
+    {
+        $converted = '';
+        $length = strlen($format);
+
+        for ($index = 0; $index < $length; $index++) {
+            $character = $format[$index];
+
+            if ($character === '\\') {
+                $index++;
+
+                if ($index < $length) {
+                    $converted .= '\\'.$format[$index];
+                }
+
+                continue;
+            }
+
+            if (isset(static::PHP_FORMAT_TOKENS[$character])) {
+                $converted .= static::PHP_FORMAT_TOKENS[$character];
+
+                continue;
+            }
+
+            $converted .= ctype_alpha($character) ? '\\'.$character : $character;
+        }
+
+        return $converted;
+    }
+
+    public function getPhpDateFormat(): string
+    {
+        return static::convertFormatToPhp($this->getDateFormat());
     }
 
     public function mode(FlatpickrMode $mode): static
@@ -468,9 +631,27 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
+    /**
+     * The kind of picker: range, multiple, time or single.
+     */
     public function getMode(): string
     {
-        return $this->mode->value;
+        return match (true) {
+            $this->isRangePicker() => FlatpickrMode::RANGE->value,
+            $this->isMultiplePicker() => FlatpickrMode::MULTIPLE->value,
+            $this->isTime() => FlatpickrMode::TIME->value,
+            default => FlatpickrMode::SINGLE->value,
+        };
+    }
+
+    /**
+     * The mode flatpickr is given; it has no time mode, as a time picker is a single picker without a calendar.
+     */
+    public function getFlatpickrMode(): string
+    {
+        $mode = $this->getMode();
+
+        return $mode === FlatpickrMode::TIME->value ? FlatpickrMode::SINGLE->value : $mode;
     }
 
     public function altInputClass(?string $altInputClass = ''): static
@@ -482,13 +663,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function getAltInputClass(): ?string
     {
-        $classes = array_filter([
-            $this->altInputClass,
-            $this->isAllowInput() ? null : 'cursor-pointer',
-            $this->isClearable() ? 'pe-9' : null,
-        ]);
-
-        return implode(' ', $classes);
+        return $this->altInputClass;
     }
 
     public function allowInput(bool $allowInput = true): static
@@ -556,9 +731,11 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this->defaultHour;
     }
 
-    public function defaultHour(int $defaultHour): void
+    public function defaultHour(int $defaultHour): static
     {
         $this->defaultHour = $defaultHour;
+
+        return $this;
     }
 
     public function getDefaultMinute(): int
@@ -614,6 +791,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this->disableMobile;
     }
 
+    /**
+     * Flatpickr is used on phones too unless this is turned off, when phones get the browser's own date input and
+     * presets, footer buttons, themes and the month and week pickers don't apply there.
+     */
     public function disableMobile(bool $disableMobile = true): static
     {
         $this->disableMobile = $disableMobile;
@@ -676,12 +857,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
-
     public function getTimezone(): string
     {
         return $this->evaluate($this->timezone) ?? config('app.timezone');
     }
-
 
     public function getMaxDate(): Carbon|string|null
     {
@@ -745,7 +924,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function isNoCalendar(): bool
     {
-        return $this->noCalendar;
+        return $this->isTime() || $this->noCalendar;
     }
 
     public function noCalendar(bool $noCalendar = true): static
@@ -899,21 +1078,29 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this->weekSelect;
     }
 
-    public function customConfig(array|\Closure $config): static
+    /**
+     * Flatpickr options merged over the ones the field sets.
+     *
+     * @param  array<string, mixed>|Closure  $config
+     */
+    public function customConfig(array|Closure $config): static
     {
         $this->config = $config;
 
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getCustomConfig(): array
     {
-        return $this->config;
+        return (array) $this->evaluate($this->config);
     }
 
     public function isSinglePicker(): bool
     {
-        return $this->mode === FlatpickrMode::SINGLE;
+        return $this->getMode() === FlatpickrMode::SINGLE->value;
     }
 
     public function range(bool $rangePicker = true): static
@@ -923,9 +1110,12 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
+    /**
+     * Whether the picker picks a range, through range() or mode(FlatpickrMode::RANGE).
+     */
     public function isRangePicker(): bool
     {
-        return $this->rangePicker;
+        return $this->rangePicker || $this->mode === FlatpickrMode::RANGE;
     }
 
     public function multiple(bool $multiplePicker = true): static
@@ -935,12 +1125,15 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
+    /**
+     * Whether the picker picks several dates, through multiple() or mode(FlatpickrMode::MULTIPLE).
+     */
     public function isMultiplePicker(): bool
     {
-        return $this->multiplePicker;
+        return ! $this->isRangePicker() && ($this->multiplePicker || $this->mode === FlatpickrMode::MULTIPLE);
     }
 
-    public function monthSelect(?bool $monthSelect = true): static
+    public function monthSelect(bool $monthSelect = true): static
     {
         $this->monthSelect = $monthSelect;
 
@@ -959,9 +1152,12 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
+    /**
+     * Month and week pickers always show their value in a separate input, in the display format.
+     */
     public function isAltInput(): bool
     {
-        return $this->altInput;
+        return $this->altInput || $this->isMonthSelect() || $this->isWeekSelect();
     }
 
     public function enableTime(bool $enableTime = true): static
@@ -971,11 +1167,26 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
+    /**
+     * Whether the picker picks a time: always for a time picker, never for a month or week picker.
+     */
     public function isEnableTime(): bool
     {
+        if ($this->isTime()) {
+            return true;
+        }
+
+        if ($this->isMonthSelect() || $this->isWeekSelect()) {
+            return false;
+        }
+
         return $this->enableTime;
     }
 
+    /**
+     * The flatpickr format of the state. Month and week pickers always use "Y-m" and "Y-m-d"; otherwise a format set
+     * with dateFormat() is kept as it is.
+     */
     public function dateFormat(string $dateFormat): static
     {
         $this->dateFormat = $dateFormat;
@@ -983,9 +1194,15 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
-    public function getDateFormat(): ?string
+    public function getDateFormat(): string
     {
-        return $this->dateFormat;
+        return match (true) {
+            $this->isTime() => $this->dateFormat ?? $this->defaultTimeFormat(),
+            $this->isMonthSelect() => 'Y-m',
+            $this->isWeekSelect() => 'Y-m-d',
+            $this->isEnableTime() => $this->dateFormat ?? 'Y-m-d H:i:s',
+            default => $this->dateFormat ?? 'Y-m-d',
+        };
     }
 
     public function altFormat(string $altFormat): static
@@ -995,14 +1212,25 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
-    public function getAltFormat(): ?string
+    public function getAltFormat(): string
     {
-        return $this->altFormat;
+        return match (true) {
+            $this->isTime() => $this->altFormat ?? $this->defaultTimeFormat(),
+            $this->isMonthSelect() => $this->altFormat ?? 'F Y',
+            $this->isWeekSelect() => $this->altFormat ?? '\Week W',
+            $this->isEnableTime() => $this->altFormat ?? 'F j, Y '.$this->defaultTimeFormat(),
+            default => $this->altFormat ?? 'F j, Y',
+        };
     }
 
-    public function theme(FlatpickrTheme $theme): static
+    protected function defaultTimeFormat(): string
     {
-        $this->theme = $theme;
+        return $this->isUse24hr() ? 'H:i' : 'h:i K';
+    }
+
+    public function theme(FlatpickrTheme|string $theme): static
+    {
+        $this->theme = $theme instanceof FlatpickrTheme ? $theme : FlatpickrTheme::from($theme);
 
         return $this;
     }
@@ -1025,7 +1253,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     /**
      * Shows quick date shortcuts beside the calendar. `true` uses the defaults for the picker mode; an array sets
      * custom shortcuts, each `['label' => ..., 'date' => ...]` for one date or `['label' => ..., 'start' => ...,
-     * 'end' => ...]` for a range.
+     * 'end' => ...]` for a range. A date is a token such as "today", text in the picker's format, or a date object.
      *
      * @param  bool|array<int, array<string, mixed>>|Closure  $presets
      */
@@ -1038,7 +1266,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function hasPresets(): bool
     {
-        return $this->evaluate($this->presets) !== null;
+        return filled($this->getPresets());
     }
 
     /**
@@ -1048,15 +1276,21 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     {
         $presets = $this->evaluate($this->presets);
 
-        if ($presets === null) {
+        if (blank($presets)) {
             return [];
         }
 
-        if (is_array($presets)) {
-            return array_values($presets);
+        if (! is_array($presets)) {
+            return $this->isRangePicker() ? $this->defaultRangePresets() : $this->defaultSinglePresets();
         }
 
-        return $this->isRangePicker() ? $this->defaultRangePresets() : $this->defaultSinglePresets();
+        return array_values(array_map(
+            fn (array $preset): array => [
+                ...$preset,
+                ...array_map($this->serializeDate(...), Arr::only($preset, ['date', 'start', 'end'])),
+            ],
+            $presets,
+        ));
     }
 
     /**
@@ -1169,7 +1403,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function getTheme(): string
     {
-        return $this->theme?->value;
+        return $this->theme->value;
     }
 
     public function getThemeAsset(): string

@@ -16,6 +16,8 @@ class FlatpickrStateCast implements StateCast
     ) {}
 
     /**
+     * The picker's text as dates in the picker's timezone.
+     *
      * @return CarbonInterface|array<int, CarbonInterface>|string|null
      */
     public function get(mixed $state): CarbonInterface|array|string|null
@@ -24,25 +26,13 @@ class FlatpickrStateCast implements StateCast
     }
 
     /**
-     * The text the picker shows for a date, a stored value or text typed in it. Text that isn't a date is kept as it
-     * is, so validation reports it instead of the field emptying while the user types.
+     * The text the picker shows for a value given to the field: a stored value or default, which is in the app's
+     * timezone, or a date from `$set()`.
      *
      * @return string|array<int, string>|null
      */
     public function set(mixed $state): string|array|null
     {
-        if (blank($state)) {
-            return null;
-        }
-
-        $parsed = $this->component->parseState($state);
-        $format = $this->component->getDateFormat();
-
-        return match (true) {
-            $parsed instanceof CarbonInterface => $parsed->format($format),
-            is_array($parsed) && filled($parsed) => array_map(static fn (CarbonInterface $date): string => $date->format($format), $parsed),
-            is_string($parsed) => $parsed,
-            default => $state,
-        };
+        return $this->component->formatStateForPicker($state);
     }
 }
