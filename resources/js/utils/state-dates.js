@@ -1,4 +1,4 @@
-import { createDateParser } from 'flatpickr/dist/esm/utils/dates';
+import { createDateFormatter, createDateParser } from 'flatpickr/dist/esm/utils/dates';
 import { tokenRegex } from 'flatpickr/dist/esm/utils/formatting';
 import { english } from 'flatpickr/dist/esm/l10n/default';
 
@@ -11,6 +11,42 @@ const englishTokens = {
   F: `(${english.months.longhand.join('|')})`,
   K: '(AM|PM|am|pm)',
 };
+
+/**
+ * A parser that only gives a date when it is the text it was read from. Flatpickr rolls a day, month or hour that
+ * doesn't exist over, reading "31/02/2024" as 2 March and "25:00" as 1:00 the next day, which the server rejects: the
+ * date written back in the format shows that. Leading zeros, spacing and letter case don't count.
+ */
+export function createStrictDateParser({ l10n = english, noCalendar = false } = {}) {
+  const parse = createDateParser({ config: { noCalendar, errorHandler: () => {} }, l10n });
+  const format = createDateFormatter({ l10n });
+  const normalize = (text) => String(text)
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\d+/g, (digits) => String(Number(digits)))
+    .toLowerCase();
+
+  return (text, dateFormat) => {
+    const parsed = parse(text, dateFormat);
+
+    if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+
+    // A timestamp or an ISO date can be written many ways, and flatpickr doesn't roll those over.
+    if (typeof text !== 'string' || /[UZ]/.test(dateFormat.replace(/\\./g, '')) || /(Z|GMT)$/.test(text.trim())) {
+      return parsed;
+    }
+
+    // Text may stop early, as flatpickr allows: "2024-01-15" in "Y-m-d H:i" is that day at midnight.
+    const written = normalize(format(parsed, dateFormat));
+    const given = normalize(text);
+    const readsAsGiven = written === given
+      || (written.startsWith(given) && /^[^\p{L}\p{N}]/u.test(written.slice(given.length)));
+
+    return readsAsGiven ? parsed : undefined;
+  };
+}
 
 /**
  * Reads a date of the field's state. The state is written in English (flatpickr.formatDate), which the server reads
@@ -31,10 +67,7 @@ export function parseStateDate(value, format, config = {}) {
   Object.assign(tokenRegex, englishTokens);
 
   try {
-    const parse = createDateParser({
-      config: { noCalendar: config.noCalendar, parseDate: config.parseDate, errorHandler: () => {} },
-      l10n: english,
-    });
+    const parse = createStrictDateParser({ l10n: english, noCalendar: config.noCalendar });
 
     const parsed = parse(String(value), format);
 

@@ -49,6 +49,25 @@ describe('parseStateDate', () => {
     expect(parseStateDate(new Date('nope'), 'Y-m-d')).toBeNull();
   });
 
+  it('gives null for a date flatpickr would roll over', () => {
+    expect(parseStateDate('31/02/2024', 'd/m/Y')).toBeNull();
+    expect(parseStateDate('12/31/2024', 'd/m/Y')).toBeNull();
+    expect(parseStateDate('32/01/2024', 'd/m/Y')).toBeNull();
+    expect(parseStateDate('2024-13', 'Y-m')).toBeNull();
+    expect(parseStateDate('2024-01-01 25:00:00', 'Y-m-d H:i:S')).toBeNull();
+  });
+
+  it('reads a date without leading zeros or in another letter case', () => {
+    expect(local(parseStateDate('5/3/2024', 'd/m/Y'))).toBe('2024-03-05 00:00:00');
+    expect(local(parseStateDate('29/02/2024', 'd/m/Y'))).toBe('2024-02-29 00:00:00');
+    expect(local(parseStateDate('2:30 pm', 'h:i K', { noCalendar: true })).slice(11)).toBe('14:30:00');
+  });
+
+  it('reads a date that stops before the time of the format', () => {
+    expect(local(parseStateDate('2024-01-15', 'Y-m-d H:i'))).toBe('2024-01-15 00:00:00');
+    expect(parseStateDate('2024-02-30', 'Y-m-d H:i')).toBeNull();
+  });
+
   it('passes a date through', () => {
     const date = new Date(2024, 0, 15);
 

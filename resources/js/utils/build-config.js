@@ -5,6 +5,8 @@ import { formatSelectedDates, getMonthSelectDefaultDate, isListMode } from './da
 import { attachFooterActions } from './footer-actions.js';
 import { resolveLocale } from './locale.js';
 import { attachPresets } from './presets.js';
+import { createStrictDateParser } from './state-dates.js';
+import { english } from 'flatpickr/dist/esm/l10n/default';
 import { usesNativeTheme } from './theme.js';
 
 export function buildFlatpickrConfig(component, modalReposition) {
@@ -34,6 +36,13 @@ export function buildFlatpickrConfig(component, modalReposition) {
       });
     },
   };
+
+  // Text typed in the picker, or a date the server sends, is read in the picker's locale without rolling over: a typed
+  // "31/02/2024" is no date, as the server says, instead of 2 March.
+  config.parseDate = createStrictDateParser({
+    l10n: { ...english, ...config.locale },
+    noCalendar: config.noCalendar,
+  });
 
   if (attribs.monthSelect === true) {
     config.plugins.push(

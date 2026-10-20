@@ -51,6 +51,19 @@ describe('state', () => {
     expect(component.fp.selectedDates[0].getHours()).toBe(14);
   });
 
+  it('does not turn a typed day that does not exist into another day', () => {
+    const component = mount({ packageConfig: { dateFormat: 'd/m/Y', allowInput: true } });
+
+    component.fp.setDate('31/02/2024', true);
+
+    expect(component.fp.selectedDates).toEqual([]);
+    expect(component.state).toBeNull();
+
+    component.fp.setDate('29/2/2024', true);
+
+    expect(component.state).toBe('29/02/2024');
+  });
+
   it('follows the state when the server changes it', async () => {
     const component = mount({ state: '2024-01-15' });
 
