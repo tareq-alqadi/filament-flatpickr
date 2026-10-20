@@ -11,7 +11,7 @@ it('gives the same config every time it is built', function () {
     $first = $component->getConfig();
 
     expect($component->getConfig())->toBe($first)
-        ->and($component->getDateFormat())->toBe('Y-m-d H:i:s');
+        ->and($component->getDateFormat())->toBe('Y-m-d H:i:S');
 });
 
 it('keeps a date format the user set on a picker with a time', function () {
@@ -27,10 +27,13 @@ it('uses the default formats for each kind of picker', function (Closure $config
         ->and($component->getAltFormat())->toBe($altFormat);
 })->with([
     'date' => [fn (Flatpickr $c) => $c, 'Y-m-d', 'F j, Y'],
-    'date and time' => [fn (Flatpickr $c) => $c->enableTime(), 'Y-m-d H:i:s', 'F j, Y h:i K'],
-    'date and 24h time' => [fn (Flatpickr $c) => $c->enableTime()->use24hr(), 'Y-m-d H:i:s', 'F j, Y H:i'],
+    'date and time' => [fn (Flatpickr $c) => $c->enableTime(), 'Y-m-d H:i:S', 'F j, Y h:i K'],
+    'date and 24h time' => [fn (Flatpickr $c) => $c->enableTime()->use24hr(), 'Y-m-d H:i:S', 'F j, Y H:i'],
     'time' => [fn (Flatpickr $c) => $c->time(), 'h:i K', 'h:i K'],
     '24h time' => [fn (Flatpickr $c) => $c->time()->use24hr(), 'H:i', 'H:i'],
+    'time with seconds' => [fn (Flatpickr $c) => $c->time()->enableSeconds(), 'h:i:S K', 'h:i:S K'],
+    '24h time with seconds' => [fn (Flatpickr $c) => $c->time()->use24hr()->enableSeconds(), 'H:i:S', 'H:i:S'],
+    'date and time with seconds' => [fn (Flatpickr $c) => $c->enableTime()->enableSeconds(), 'Y-m-d H:i:S', 'F j, Y h:i:S K'],
     'month' => [fn (Flatpickr $c) => $c->monthSelect(), 'Y-m', 'F Y'],
     'week' => [fn (Flatpickr $c) => $c->weekSelect(), 'Y-m-d', '\Week W'],
 ]);
@@ -80,6 +83,18 @@ it('sends min and max dates as calendar days in the picker format', function () 
 
     expect($config['minDate'])->toBe('2024-01-10')
         ->and($config['maxDate'])->toBe('2024-02-01');
+});
+
+it('takes min and max dates as any date object or a closure', function () {
+    $config = picker()
+        ->minDate(\Carbon\CarbonImmutable::parse('2024-01-10'))
+        ->maxDate(fn () => \Carbon\Carbon::parse('2024-02-01'))
+        ->getConfig();
+
+    expect($config['minDate'])->toBe('2024-01-10')
+        ->and($config['maxDate'])->toBe('2024-02-01')
+        ->and(picker()->minDate(new DateTimeImmutable('2024-03-04'))->getConfig()['minDate'])->toBe('2024-03-04')
+        ->and(picker()->minDate(null)->getConfig()['minDate'])->toBeNull();
 });
 
 it('sends dates given in code in the picker format and timezone', function () {

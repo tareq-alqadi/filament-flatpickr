@@ -1,4 +1,5 @@
 import { ensureCalendarMainWrapper } from './calendar-layout.js';
+import { parseStateDate } from './state-dates.js';
 
 const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -57,18 +58,17 @@ export function resolvePresetDate(value, fp) {
   }
 }
 
+// A preset date given in code comes in the state's format, which is English whatever the picker's locale.
 function parsePresetDate(value, fp) {
-  const isValid = (date) => date instanceof Date && !Number.isNaN(date.getTime());
+  const parsed = fp ? parseStateDate(value, fp.config.dateFormat, fp.config) : null;
 
-  const parsed = fp?.parseDate(String(value), fp.config.dateFormat);
-
-  if (isValid(parsed)) {
+  if (parsed) {
     return parsed;
   }
 
   const fallback = new Date(value);
 
-  return isValid(fallback) ? fallback : null;
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
 /**

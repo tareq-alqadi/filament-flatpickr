@@ -73,8 +73,17 @@ it('shows a stored time in the picker format and saves it as a time', function (
     expect(shown($twelveHour, '14:30:00'))->toBe('2:30 PM')
         ->and(shown($twentyFourHour, '14:30:00'))->toBe('14:30')
         ->and(Flatpickr::dehydratePickerState($twelveHour, '2:30 PM'))->toBe('14:30')
-        ->and(Flatpickr::dehydratePickerState($twelveHour->enableSeconds(), '2:30 PM'))->toBe('14:30:00')
         ->and(Flatpickr::dehydratePickerState($twentyFourHour, '14:30'))->toBe('14:30');
+});
+
+it('keeps the seconds of a time picker with seconds', function () {
+    $twelveHour = picker()->time()->enableSeconds();
+    $twentyFourHour = picker()->time()->use24hr()->enableSeconds();
+
+    expect(shown($twelveHour, '14:30:15'))->toBe('2:30:15 PM')
+        ->and(Flatpickr::dehydratePickerState($twelveHour, '2:30:15 PM'))->toBe('14:30:15')
+        ->and(shown($twentyFourHour, '14:30:15'))->toBe('14:30:15')
+        ->and(Flatpickr::dehydratePickerState($twentyFourHour, '14:30:15'))->toBe('14:30:15');
 });
 
 it('saves a picked day as the same calendar day in the app timezone', function () {

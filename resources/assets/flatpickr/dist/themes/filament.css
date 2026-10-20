@@ -307,6 +307,11 @@
     width: calc(2.5rem * 7);
 }
 
+/* With showMonths(), the header stretches over every month shown, each title above its own month. */
+.flatpickr-calendar.fi-fp-calendar.multiMonth .flatpickr-months {
+    width: auto;
+}
+
 .fi-fp-calendar .flatpickr-day {
     height: 2.25rem;
     line-height: calc(2.25rem - 2px);

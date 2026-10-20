@@ -1,8 +1,9 @@
 import flatpickr from 'flatpickr';
 import { buildFlatpickrConfig } from './utils/build-config.js';
 import { disableBrowserHints } from './utils/disable-hints.js';
-import { parseMonthSelectDate } from './utils/date-helpers.js';
+import { isListMode, parseMonthSelectDate } from './utils/date-helpers.js';
 import { ModalReposition } from './utils/modal-reposition.js';
+import { parseStateDates } from './utils/state-dates.js';
 import { applyThemeMode, currentThemeMode, isDarkMode, watchThemeMode } from './utils/theme.js';
 
 export default function flatpickrDatepicker({
@@ -58,16 +59,18 @@ export default function flatpickrDatepicker({
       }
 
       if (this.isMonthSelect) {
-        const parsedDate = parseMonthSelectDate(
-          value,
-          this.packageConfig.dateFormat,
-          this.fp,
-        );
+        this.fp.setDate(parseMonthSelectDate(value, this.packageConfig.dateFormat));
 
-        this.fp.setDate(parsedDate);
-      } else {
-        this.fp.setDate(value);
+        return;
       }
+
+      // The state is English text; the picker's parser only reads its own locale. Text that isn't a date in the
+      // format, such as something typed in the picker, is left to flatpickr, and so is a range or list given as text.
+      const dates = isListMode(this.attribs.mode) && !Array.isArray(value)
+        ? null
+        : parseStateDates(value, this.packageConfig.dateFormat, this.fp.config);
+
+      this.fp.setDate(dates ?? value);
     },
 
     init() {

@@ -75,10 +75,15 @@ writes values. A format you set is kept as it is. Without one, the field uses:
 | Picker | `dateFormat` | `altFormat` |
 | --- | --- | --- |
 | Date | `Y-m-d` | `F j, Y` |
-| Date and time | `Y-m-d H:i:s` | `F j, Y h:i K` (`F j, Y H:i` with `->use24hr()`) |
+| Date and time | `Y-m-d H:i:S` | `F j, Y h:i K` (`F j, Y H:i` with `->use24hr()`) |
 | Time | `h:i K` (`H:i` with `->use24hr()`) | the same |
 | Month | always `Y-m` | `F Y` |
 | Week | always `Y-m-d` | `\Week W` |
+
+With `->enableSeconds()`, the time formats get seconds (`h:i:S K`, `H:i:S`).
+
+The state is always written in English, whatever the calendar's locale, so month names and AM/PM in `dateFormat` stay
+readable by the server. The calendar and `altFormat` use the locale.
 
 ### Limits
 
@@ -90,7 +95,12 @@ Flatpickr::make('date')
     ->enabledDates([...]);   // only these dates can be picked
 ```
 
-Dates given as `Carbon` objects are sent in the picker's format and timezone.
+`minDate()` and `maxDate()` take text, any date object or a closure, such as `fn (Get $get) => $get('starts_at')`.
+Dates given as objects are sent in the picker's format and timezone.
+
+A date before `minDate()` or after `maxDate()` also fails validation on the server, with Laravel's
+`validation.after_or_equal` and `validation.before_or_equal` messages. A month picker may pick the month `minDate()`
+falls in.
 
 ### Shortcuts and buttons
 
@@ -161,6 +171,10 @@ A `->readOnly()` field doesn't open the calendar.
 - `disableMobile` defaults to `true`: phones get Flatpickr instead of the browser's date input.
 - The default theme is `filament`; set `default_theme` in the config to keep another.
 - A `dateFormat()` you set is no longer replaced when the picker has a time.
+- A date and time picker's default format pads the seconds (`Y-m-d H:i:S`), and a time picker with
+  `->enableSeconds()` saves the seconds picked instead of `:00`.
+- `minDate()` and `maxDate()` are checked on the server too, and are kept as given until the form is built, so a
+  closure is evaluated each time.
 - `altInputClass` defaults to empty, so the visible input keeps the field's classes.
 - The placeholder `filament-flatpickr` artisan command and the `Flatpickr::PACKAGE_NAME` constant were removed; use
   `FilamentFlatpickr::getPackageName()`.

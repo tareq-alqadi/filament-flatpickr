@@ -118,9 +118,9 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected string | Closure | null $timezone = null;
 
-    protected Carbon|string|null $maxDate = null;
+    protected DateTimeInterface|string|Closure|null $maxDate = null;
 
-    protected Carbon|string|null $minDate = null;
+    protected DateTimeInterface|string|Closure|null $minDate = null;
 
     protected ?string $maxTime = null;
 
@@ -279,7 +279,11 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         $this->rule(static fn (Flatpickr $component): Closure => static function (string $attribute, mixed $value, Closure $fail) use ($component): void {
             if ($component->hasInvalidState()) {
                 $fail('validation.date')->translate();
+
+                return;
             }
+
+            $component->validateDateLimits($fail);
         });
 
         // A stored value, in the app's timezone, becomes the text the picker shows. With castsStateToDates() the state
@@ -862,28 +866,82 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this->evaluate($this->timezone) ?? config('app.timezone');
     }
 
-    public function getMaxDate(): Carbon|string|null
+    public function getMaxDate(): CarbonInterface|string|null
     {
-        return $this->maxDate;
+        return $this->resolveDateLimit($this->evaluate($this->maxDate));
     }
 
-    public function maxDate(Carbon|string|null $maxDate = 'now'): static
+    public function maxDate(DateTimeInterface|string|Closure|null $maxDate = 'now'): static
     {
-        $this->maxDate = $maxDate ? Carbon::parse($maxDate) : $maxDate;
+        $this->maxDate = $maxDate;
 
         return $this;
     }
 
-    public function getMinDate(): Carbon|string|null
+    public function getMinDate(): CarbonInterface|string|null
     {
-        return $this->minDate;
+        return $this->resolveDateLimit($this->evaluate($this->minDate));
     }
 
-    public function minDate(Carbon|string|null $minDate): static
+    public function minDate(DateTimeInterface|string|Closure|null $minDate): static
     {
-        $this->minDate = $minDate ? Carbon::parse($minDate) : $minDate;
+        $this->minDate = $minDate;
 
         return $this;
+    }
+
+    /**
+     * A limit as a date in the app's timezone. Text Carbon can't read is sent to flatpickr as it is.
+     */
+    protected function resolveDateLimit(mixed $date): CarbonInterface|string|null
+    {
+        if (blank($date)) {
+            return null;
+        }
+
+        if ($date instanceof DateTimeInterface) {
+            return Carbon::instance($date);
+        }
+
+        try {
+            return Carbon::parse((string) $date, config('app.timezone'))->setTimezone(config('app.timezone'));
+        } catch (InvalidFormatException) {
+            return (string) $date;
+        }
+    }
+
+    /**
+     * Fails a picked date before minDate() or after maxDate(): the calendar keeps to them, but a request can hold
+     * anything. A month picker may pick the month minDate() falls in.
+     */
+    protected function validateDateLimits(Closure $fail): void
+    {
+        if ($this->isTime()) {
+            return;
+        }
+
+        $dates = collect(Arr::wrap($this->parseState($this->getRawState())));
+
+        if ($dates->isEmpty()) {
+            return;
+        }
+
+        if (($min = $this->getMinDate()) instanceof CarbonInterface) {
+            $min = $this->toPickerTimezone($min);
+            $min = $this->isMonthSelect() ? $min->startOfMonth() : $min;
+
+            if ($dates->contains(fn (CarbonInterface $date): bool => $date->lt($min))) {
+                $fail('validation.after_or_equal')->translate(['date' => $this->formatDate($min)]);
+            }
+        }
+
+        if (($max = $this->getMaxDate()) instanceof CarbonInterface) {
+            $max = $this->toPickerTimezone($max);
+
+            if ($dates->contains(fn (CarbonInterface $date): bool => $date->gt($max))) {
+                $fail('validation.before_or_equal')->translate(['date' => $this->formatDate($max)]);
+            }
+        }
     }
 
     public function getMaxTime(): ?string
@@ -1200,7 +1258,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             $this->isTime() => $this->dateFormat ?? $this->defaultTimeFormat(),
             $this->isMonthSelect() => 'Y-m',
             $this->isWeekSelect() => 'Y-m-d',
-            $this->isEnableTime() => $this->dateFormat ?? 'Y-m-d H:i:s',
+            $this->isEnableTime() => $this->dateFormat ?? 'Y-m-d H:i:S',
             default => $this->dateFormat ?? 'Y-m-d',
         };
     }
@@ -1225,7 +1283,9 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected function defaultTimeFormat(): string
     {
-        return $this->isUse24hr() ? 'H:i' : 'h:i K';
+        $seconds = $this->isEnableSeconds() ? ':S' : '';
+
+        return $this->isUse24hr() ? "H:i{$seconds}" : "h:i{$seconds} K";
     }
 
     public function theme(FlatpickrTheme|string $theme): static
