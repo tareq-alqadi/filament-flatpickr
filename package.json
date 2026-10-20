@@ -5,10 +5,13 @@
         "dev": "node bin/build.js --dev",
         "dev:scripts": "node bin/build.js --dev",
         "build": "node bin/build.js",
-        "build:scripts": "node bin/build.js"
+        "build:scripts": "node bin/build.js",
+        "test": "vitest run"
     },
     "devDependencies": {
         "esbuild": "^0.28.2",
-        "flatpickr": "^4.6.13"
+        "flatpickr": "^4.6.13",
+        "happy-dom": "^21.0.4",
+        "vitest": "^4.1.12"
     }
 }
