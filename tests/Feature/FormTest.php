@@ -1,11 +1,13 @@
 <?php
 
+use Carbon\CarbonInterface;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
 use Livewire\Livewire;
+use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 use TareqAlqadi\FilamentFlatpickr\Forms\Components\Flatpickr;
 
 class FlatpickrTestForm extends Component implements HasForms
@@ -80,7 +82,7 @@ it('reports a range with an end that is not a date', function () {
         ->assertHasErrors(['data.date']);
 });
 
-it('reports a date before minDate or after maxDate', function (Closure $field, mixed $state, ?string $message) {
+it('reports a date the picker rules out', function (Closure $field, mixed $state, ?string $message) {
     $form = testForm($field)->set('data.date', $state)->call('save');
 
     $message === null
@@ -108,7 +110,93 @@ it('reports a date before minDate or after maxDate', function (Closure $field, m
         '2024-01-10',
         null,
     ],
+    'a disabled day' => [fn () => Flatpickr::make('date')->disabledDates(['2024-01-10']), '2024-01-10', 'is invalid'],
+    'a day in a disabled range' => [
+        fn () => Flatpickr::make('date')->disabledDates([['from' => '2024-01-08', 'to' => '2024-01-12']]),
+        '2024-01-11',
+        'is invalid',
+    ],
+    'a day after a disabled range' => [
+        fn () => Flatpickr::make('date')->disabledDates([['from' => '2024-01-08', 'to' => '2024-01-12']]),
+        '2024-01-13',
+        null,
+    ],
+    'a day disabled as a date object in another timezone' => [
+        fn () => Flatpickr::make('date')->timezone('America/New_York')->disabledDates(fn () => [Carbon::parse('2024-01-10')]),
+        '2024-01-10',
+        'is invalid',
+    ],
+    'a moment on a disabled day' => [
+        fn () => Flatpickr::make('date')->enableTime()->disabledDates(['2024-01-10']),
+        '2024-01-10 09:00:00',
+        'is invalid',
+    ],
+    'a range starting on a disabled day' => [
+        fn () => Flatpickr::make('date')->range()->disabledDates(['2024-01-10']),
+        ['2024-01-10', '2024-01-12'],
+        'is invalid',
+    ],
+    'an enabled day' => [fn () => Flatpickr::make('date')->enabledDates(['2024-01-10']), '2024-01-10', null],
+    'a day that is not enabled' => [fn () => Flatpickr::make('date')->enabledDates(fn () => ['2024-01-10']), '2024-01-11', 'is invalid'],
+    'a day in another format that is not enabled' => [
+        fn () => Flatpickr::make('date')->dateFormat('d/m/Y')->enabledDates(['10/01/2024']),
+        '11/01/2024',
+        'is invalid',
+    ],
 ]);
+
+it('saves each kind of picker', function (Closure $field, mixed $state, mixed $saved) {
+    testForm($field)
+        ->set('data.date', $state)
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertSet('saved', function (mixed $value) use ($saved): bool {
+            $normalize = fn (mixed $date): mixed => $date instanceof CarbonInterface ? $date->toDateTimeString() : $date;
+
+            return (is_array($value) ? array_map($normalize, $value) : $normalize($value)) === $saved;
+        });
+})->with([
+    'date' => [fn () => Flatpickr::make('date'), '2024-01-15', '2024-01-15 00:00:00'],
+    'date and time' => [fn () => Flatpickr::make('date')->enableTime(), '2024-01-15 14:30:05', '2024-01-15 14:30:05'],
+    'range' => [fn () => Flatpickr::make('date')->range(), ['2024-01-01', '2024-01-05'], ['2024-01-01 00:00:00', '2024-01-05 00:00:00']],
+    'multiple' => [fn () => Flatpickr::make('date')->multiple(), ['2024-01-01', '2024-03-01'], ['2024-01-01 00:00:00', '2024-03-01 00:00:00']],
+    'month' => [fn () => Flatpickr::make('date')->monthSelect(), '2024-02', '2024-02-01 00:00:00'],
+    'week' => [fn () => Flatpickr::make('date')->weekSelect(), '2024-01-17', '2024-01-17 00:00:00'],
+    'time' => [fn () => Flatpickr::make('date')->time(), '2:30 PM', '14:30'],
+    'time with seconds' => [fn () => Flatpickr::make('date')->time()->use24hr()->enableSeconds(), '14:30:15', '14:30:15'],
+]);
+
+it('requires a range to hold a date', function () {
+    testForm(fn () => Flatpickr::make('date')->range()->required())
+        ->set('data.date', [])
+        ->call('save')
+        ->assertHasErrors(['data.date' => 'required']);
+});
+
+it('renders the app locale and translated labels', function () {
+    app()->setLocale('ar');
+
+    testForm(fn () => Flatpickr::make('date')->clearable()->footerActions())
+        ->assertSeeHtml("locale: 'ar'")
+        ->assertSeeHtml('aria-label="مسح"');
+});
+
+it('hides the clear button on a read-only or disabled field', function (Closure $field) {
+    testForm($field)
+        ->assertSeeHtml('fi-fp-field')
+        ->assertDontSeeHtml('fi-fp-clear-btn');
+})->with([
+    'read-only' => [fn () => Flatpickr::make('date')->clearable()->readOnly()],
+    'disabled' => [fn () => Flatpickr::make('date')->clearable()->disabled()],
+]);
+
+it('links the stylesheet of a flatpickr theme but not of the Filament theme', function () {
+    testForm(fn () => Flatpickr::make('date')->theme(FlatpickrTheme::MATERIAL_BLUE))
+        ->assertSeeHtml('x-ref="themeStylesheet"');
+
+    testForm(fn () => Flatpickr::make('date'))
+        ->assertDontSeeHtml('x-ref="themeStylesheet"');
+});
 
 it('accepts an empty optional picker', function () {
     testForm(fn () => Flatpickr::make('date'))

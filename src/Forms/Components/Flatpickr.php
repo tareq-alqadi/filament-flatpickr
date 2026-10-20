@@ -102,9 +102,9 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected int $defaultSeconds = 0;
 
-    protected array $disabledDates = [];
+    protected array|Closure $disabledDates = [];
 
-    protected ?array $enabledDates = null;
+    protected array|Closure|null $enabledDates = null;
 
     protected bool $disableMobile = true;
 
@@ -768,10 +768,13 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function getDisabledDates(): array
     {
-        return $this->disabledDates;
+        return (array) $this->evaluate($this->disabledDates);
     }
 
-    public function disabledDates(array $disabledDates = []): static
+    /**
+     * Dates that can't be picked: dates, text, and `['from' => ..., 'to' => ...]` ranges.
+     */
+    public function disabledDates(array|Closure $disabledDates = []): static
     {
         $this->disabledDates = $disabledDates;
 
@@ -780,10 +783,15 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function getEnabledDates(): ?array
     {
-        return $this->enabledDates;
+        $enabledDates = $this->evaluate($this->enabledDates);
+
+        return $enabledDates === null ? null : (array) $enabledDates;
     }
 
-    public function enabledDates(array $enabledDates = []): static
+    /**
+     * The only dates that can be picked, in the same forms as disabledDates().
+     */
+    public function enabledDates(array|Closure $enabledDates = []): static
     {
         $this->enabledDates = $enabledDates;
 
@@ -911,8 +919,9 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     }
 
     /**
-     * Fails a picked date before minDate() or after maxDate(): the calendar keeps to them, but a request can hold
-     * anything. A month picker may pick the month minDate() falls in.
+     * Fails a picked date before minDate() or after maxDate(), or on a day disabledDates() or enabledDates() rules
+     * out: the calendar keeps to them, but a request can hold anything. A month picker may pick the month minDate()
+     * falls in, and its days aren't checked.
      */
     protected function validateDateLimits(Closure $fail): void
     {
@@ -942,6 +951,78 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
                 $fail('validation.before_or_equal')->translate(['date' => $this->formatDate($max)]);
             }
         }
+
+        if ($this->isMonthSelect()) {
+            return;
+        }
+
+        $disabled = $this->resolveDayRanges($this->getDisabledDates());
+        $enabled = filled($enabledDates = $this->getEnabledDates()) ? $this->resolveDayRanges($enabledDates) : null;
+
+        $isRuledOut = fn (CarbonInterface $date): bool => $this->isDayIn($date, $disabled)
+            || ($enabled !== null && ! $this->isDayIn($date, $enabled));
+
+        if ($dates->contains($isRuledOut)) {
+            $fail('validation.in')->translate();
+        }
+    }
+
+    /**
+     * Entries of disabledDates() or enabledDates() as `[from, to]` days ("Y-m-d") in the picker's timezone, the way
+     * flatpickr reads them. Entries that aren't dates are left out.
+     *
+     * @return array<int, array{0: string, 1: string}>
+     */
+    protected function resolveDayRanges(array $entries): array
+    {
+        return collect($entries)
+            ->map(function (mixed $entry): ?array {
+                [$from, $to] = is_array($entry)
+                    ? [$this->resolveDay($entry['from'] ?? null), $this->resolveDay($entry['to'] ?? null)]
+                    : [$this->resolveDay($entry), $this->resolveDay($entry)];
+
+                return ($from && $to) ? [$from, $to] : null;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The day a date given in code falls on in the picker, as serializeDate() sends it. Text is read in the picker's
+     * format, or else as a day in the picker's timezone, like "2024-12-25" or "today".
+     */
+    protected function resolveDay(mixed $date): ?string
+    {
+        if ($date instanceof DateTimeInterface) {
+            return $this->toPickerTimezone(Carbon::instance($date))->format('Y-m-d');
+        }
+
+        if (! is_scalar($date) || blank($date)) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('!'.$this->getPhpDateFormat(), (string) $date, $this->getTimezone())->format('Y-m-d');
+        } catch (InvalidFormatException) {
+            // Not in the picker's format.
+        }
+
+        try {
+            return Carbon::parse((string) $date, $this->getTimezone())->setTimezone($this->getTimezone())->format('Y-m-d');
+        } catch (InvalidFormatException) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<int, array{0: string, 1: string}>  $ranges
+     */
+    protected function isDayIn(CarbonInterface $date, array $ranges): bool
+    {
+        $day = $date->format('Y-m-d');
+
+        return collect($ranges)->contains(fn (array $range): bool => $day >= $range[0] && $day <= $range[1]);
     }
 
     public function getMaxTime(): ?string

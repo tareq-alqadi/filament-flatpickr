@@ -39,8 +39,12 @@ export function resolvePresetDate(value, fp) {
       return addDays(today, -6);
     case 'last_30_days':
       return addDays(today, -29);
-    case 'next_month':
-      return new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    case 'next_month': {
+      // The same day next month, or its last day: 31 January gives 29 February, not 2 March.
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 2, 0).getDate();
+
+      return new Date(today.getFullYear(), today.getMonth() + 1, Math.min(today.getDate(), lastDay));
+    }
     case 'start_of_month':
       return new Date(today.getFullYear(), today.getMonth(), 1);
     case 'end_of_month':

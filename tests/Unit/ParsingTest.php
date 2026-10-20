@@ -145,3 +145,39 @@ it('round-trips dates through the state cast', function () {
         ->and($cast->set($date))->toBe($text)
         ->and($cast->set('not a date'))->toBe('not a date');
 });
+
+it('gives the state cast lists, nothing, and text in the picker format', function () {
+    $cast = new FlatpickrStateCast(picker()->range()->castsStateToDates());
+    $custom = new FlatpickrStateCast(picker()->dateFormat('d/m/Y')->castsStateToDates());
+
+    expect($cast->set(['2024-01-01', Carbon::parse('2024-01-05')]))->toBe(['2024-01-01', '2024-01-05'])
+        ->and($cast->set(null))->toBeNull()
+        ->and($cast->get(null))->toBeNull()
+        ->and(array_map(fn ($date) => $date->toDateString(), $cast->get(['2024-01-01', '2024-01-05'])))->toBe(['2024-01-01', '2024-01-05'])
+        ->and($custom->set('05/02/2024'))->toBe('05/02/2024')
+        ->and($custom->get('05/02/2024')->toDateString())->toBe('2024-02-05');
+});
+
+it('reads the first date when a single picker is given a list', function () {
+    expect(picker()->parseState(['2024-01-15', '2024-01-20'])->toDateString())->toBe('2024-01-15');
+});
+
+it('shows and saves the day picked in a week', function () {
+    $component = picker()->weekSelect();
+
+    expect(shown($component, '2024-01-17 10:00:00'))->toBe('2024-01-17')
+        ->and(Flatpickr::dehydratePickerState($component, '2024-01-17')->toDateString())->toBe('2024-01-17')
+        ->and($component->getConfig()['altInput'])->toBeTrue()
+        ->and(picker()->weekSelect()->enableTime()->isEnableTime())->toBeFalse();
+});
+
+it('shows a stored month as the month and saves its first day', function () {
+    $component = picker()->monthSelect();
+
+    expect(shown($component, '2024-02-29'))->toBe('2024-02')
+        ->and(Flatpickr::dehydratePickerState($component, '2024-02')->toDateString())->toBe('2024-02-01');
+});
+
+it('pads the seconds of a stored moment', function () {
+    expect(shown(picker()->enableTime(), '2024-01-15 10:00:05'))->toBe('2024-01-15 10:00:05');
+});

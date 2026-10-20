@@ -98,9 +98,12 @@ Flatpickr::make('date')
 `minDate()` and `maxDate()` take text, any date object or a closure, such as `fn (Get $get) => $get('starts_at')`.
 Dates given as objects are sent in the picker's format and timezone.
 
-A date before `minDate()` or after `maxDate()` also fails validation on the server, with Laravel's
-`validation.after_or_equal` and `validation.before_or_equal` messages. A month picker may pick the month `minDate()`
-falls in.
+`disabledDates()` and `enabledDates()` take an array or a closure.
+
+A date the calendar wouldn't let the user pick also fails validation on the server: before `minDate()` or after
+`maxDate()` (Laravel's `validation.after_or_equal` and `validation.before_or_equal` messages), or on a day
+`disabledDates()` or `enabledDates()` rules out (`validation.in`). A month picker may pick the month `minDate()` falls
+in, and its days aren't checked.
 
 ### Shortcuts and buttons
 
@@ -173,8 +176,8 @@ A `->readOnly()` field doesn't open the calendar.
 - A `dateFormat()` you set is no longer replaced when the picker has a time.
 - A date and time picker's default format pads the seconds (`Y-m-d H:i:S`), and a time picker with
   `->enableSeconds()` saves the seconds picked instead of `:00`.
-- `minDate()` and `maxDate()` are checked on the server too, and are kept as given until the form is built, so a
-  closure is evaluated each time.
+- `minDate()`, `maxDate()`, `disabledDates()` and `enabledDates()` are checked on the server too. They are kept as
+  given until the form is built, so a closure is evaluated each time.
 - `altInputClass` defaults to empty, so the visible input keeps the field's classes.
 - The placeholder `filament-flatpickr` artisan command and the `Flatpickr::PACKAGE_NAME` constant were removed; use
   `FilamentFlatpickr::getPackageName()`.
@@ -185,6 +188,7 @@ A `->readOnly()` field doesn't open the calendar.
 composer install
 composer test        # Pest
 npm install
+npm test             # Vitest
 npm run build        # rebuilds resources/js/dist/flatpickr.js
 ```
 

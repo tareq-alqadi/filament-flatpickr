@@ -165,6 +165,25 @@ it('sends preset dates given in code in the picker format', function () {
         ->and($presets[1]['date'])->toBe('tomorrow');
 });
 
+it('takes disabled and enabled dates as closures', function () {
+    $config = picker()
+        ->disabledDates(fn () => ['2024-01-10'])
+        ->enabledDates(fn () => [['from' => Carbon::parse('2024-01-01'), 'to' => '2024-01-31']])
+        ->getConfig();
+
+    expect($config['disable'])->toBe(['2024-01-10'])
+        ->and($config['enable'])->toBe([['from' => '2024-01-01', 'to' => '2024-01-31']])
+        ->and(picker()->getConfig())->not->toHaveKey('enable');
+});
+
+it('translates the default presets and footer labels', function () {
+    app()->setLocale('ar');
+
+    expect(picker()->getActionLabels())->toBe(['today' => 'اليوم', 'clear' => 'مسح', 'apply' => 'تطبيق'])
+        ->and(picker()->presets()->getPresets()[1]['label'])->toBe('غدًا')
+        ->and(picker()->range()->presets()->getPresets())->toHaveCount(7);
+});
+
 it('converts flatpickr formats to php formats', function (string $flatpickr, string $php) {
     expect(Flatpickr::convertFormatToPhp($flatpickr))->toBe($php);
 })->with([
@@ -173,4 +192,8 @@ it('converts flatpickr formats to php formats', function (string $flatpickr, str
     ['h:i K', 'g:i A'],
     ['d/m/Y G:i', 'd/m/Y h:i'],
     ['\Week W', '\W\e\e\k W'],
+    ['J F Y', 'jS F Y'],
+    ['D, M j y', 'D, M j y'],
+    ['Y-m-d \a\t H:i', 'Y-m-d \a\t H:i'],
+    ['U', 'U'],
 ]);
