@@ -16,6 +16,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMode;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrMonthSelectorType;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrPosition;
@@ -376,15 +377,19 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     }
 
     /**
-     * Whether the field holds something that isn't a date: text typed in the picker, or a range or list with an entry
-     * that isn't one.
+     * Whether the field holds something that isn't a date, or a time for a time picker: text typed in the picker, or a
+     * range or list with an entry that isn't one.
      */
     public function hasInvalidState(): bool
     {
         $state = $this->getRawState();
 
-        if (blank($state) || $this->isTime()) {
+        if (blank($state)) {
             return false;
+        }
+
+        if ($this->isTime()) {
+            return $this->parseTime($state) === null;
         }
 
         if ($this->isRangePicker() || $this->isMultiplePicker()) {
@@ -447,11 +452,27 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             return null;
         }
 
+        return static::withoutRollover(fn () => Carbon::createFromFormat('!'.$this->getPhpDateFormat(), (string) $date, $this->getTimezone()))
+            ?? $this->parseInAppTimezone((string) $date);
+    }
+
+    /**
+     * Runs a Carbon parse, giving null when it fails or when PHP only reads the text by rolling it over, as it reads
+     * "2024-02-31" as 2 March, "2026-13" as January 2027 and "25:00" as 1:00 the next day.
+     *
+     * @param  Closure(): CarbonInterface  $parse
+     */
+    protected static function withoutRollover(Closure $parse): ?CarbonInterface
+    {
         try {
-            return Carbon::createFromFormat('!'.$this->getPhpDateFormat(), (string) $date, $this->getTimezone());
+            $date = $parse();
         } catch (InvalidFormatException) {
-            return $this->parseInAppTimezone((string) $date);
+            return null;
         }
+
+        $errors = Carbon::getLastErrors();
+
+        return ($errors && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) ? null : $date;
     }
 
     /**
@@ -477,13 +498,9 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected function parseInAppTimezone(string $date): ?CarbonInterface
     {
-        try {
-            $parsed = Carbon::parse($date, config('app.timezone'))->setTimezone(config('app.timezone'));
-        } catch (InvalidFormatException) {
-            return null;
-        }
+        $parsed = static::withoutRollover(fn () => Carbon::parse($date, config('app.timezone')));
 
-        return $this->toPickerTimezone($parsed);
+        return $parsed ? $this->toPickerTimezone($parsed->setTimezone(config('app.timezone'))) : null;
     }
 
     /**
@@ -509,23 +526,53 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
      */
     protected function formatTime(mixed $time, string $format): mixed
     {
+        return $this->parseTime($time)?->format($format) ?? $time;
+    }
+
+    /**
+     * A time as the picker shows it, as a database stores it ("14:30:00", "14:30" or "2024-01-15 14:30:00"), or a
+     * date. Text that isn't a time, or a time like "25:00", gives null.
+     */
+    protected function parseTime(mixed $time): ?CarbonInterface
+    {
         if ($time instanceof DateTimeInterface) {
-            return $time->format($format);
+            return Carbon::instance($time);
         }
 
-        if (! is_scalar($time)) {
-            return $time;
+        if (! is_scalar($time) || blank($time)) {
+            return null;
         }
 
-        try {
-            return Carbon::createFromFormat('!'.$this->getPhpDateFormat(), (string) $time)->format($format);
-        } catch (InvalidFormatException) {
-            try {
-                return Carbon::parse((string) $time)->format($format);
-            } catch (InvalidFormatException) {
-                return $time;
+        foreach (['!'.$this->getPhpDateFormat(), '!H:i:s', '!H:i', '!Y-m-d H:i:s'] as $format) {
+            if ($parsed = static::withoutRollover(fn () => Carbon::createFromFormat($format, (string) $time))) {
+                return $parsed;
             }
         }
+
+        return null;
+    }
+
+    /**
+     * A minTime() or maxTime() as seconds after midnight, read the way flatpickr reads it.
+     */
+    protected function parseTimeLimit(?string $time): ?int
+    {
+        if (blank($time)) {
+            return null;
+        }
+
+        foreach (['!H:i:s', '!H:i'] as $format) {
+            if ($parsed = static::withoutRollover(fn () => Carbon::createFromFormat($format, $time))) {
+                return static::secondsSinceMidnight($parsed);
+            }
+        }
+
+        return null;
+    }
+
+    protected static function secondsSinceMidnight(CarbonInterface $time): int
+    {
+        return ($time->hour * 3600) + ($time->minute * 60) + $time->second;
     }
 
     /**
@@ -539,7 +586,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         }
 
         if ($component->isTime()) {
-            return $component->formatTime($state, $component->isEnableSeconds() ? 'H:i:s' : 'H:i');
+            return $component->parseTime($state)?->format($component->isEnableSeconds() ? 'H:i:s' : 'H:i');
         }
 
         $parsed = $component->parseState($state);
@@ -926,6 +973,8 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     protected function validateDateLimits(Closure $fail): void
     {
         if ($this->isTime()) {
+            $this->validateTimeLimits(collect(array_filter([$this->parseTime($this->getRawState())])), $fail);
+
             return;
         }
 
@@ -933,6 +982,10 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
         if ($dates->isEmpty()) {
             return;
+        }
+
+        if ($this->isEnableTime()) {
+            $this->validateTimeLimits($dates, $fail);
         }
 
         if (($min = $this->getMinDate()) instanceof CarbonInterface) {
@@ -964,6 +1017,40 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
         if ($dates->contains($isRuledOut)) {
             $fail('validation.in')->translate();
+        }
+    }
+
+    /**
+     * Fails a time of day before minTime() or after maxTime(), as the picker shows it. A minTime() later than the
+     * maxTime() allows a span over midnight, as flatpickr does.
+     *
+     * @param  Collection<int, CarbonInterface>  $times
+     */
+    protected function validateTimeLimits(Collection $times, Closure $fail): void
+    {
+        $min = $this->parseTimeLimit($this->getMinTime());
+        $max = $this->parseTimeLimit($this->getMaxTime());
+
+        if ((($min === null) && ($max === null)) || $times->isEmpty()) {
+            return;
+        }
+
+        $seconds = $times->map(fn (CarbonInterface $time): int => static::secondsSinceMidnight($time));
+
+        if (($min !== null) && ($max !== null) && ($min > $max)) {
+            if ($seconds->contains(fn (int $second): bool => ($second < $min) && ($second > $max))) {
+                $fail('validation.in')->translate();
+            }
+
+            return;
+        }
+
+        if (($min !== null) && $seconds->contains(fn (int $second): bool => $second < $min)) {
+            $fail('validation.after_or_equal')->translate(['date' => $this->getMinTime()]);
+        }
+
+        if (($max !== null) && $seconds->contains(fn (int $second): bool => $second > $max)) {
+            $fail('validation.before_or_equal')->translate(['date' => $this->getMaxTime()]);
         }
     }
 
@@ -1218,7 +1305,8 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
     }
 
     /**
-     * Flatpickr options merged over the ones the field sets.
+     * Flatpickr options merged over the ones the field sets. They reach the browser as JSON, so they can't hold
+     * functions: hooks such as onChange and plugins can't be given here.
      *
      * @param  array<string, mixed>|Closure  $config
      */

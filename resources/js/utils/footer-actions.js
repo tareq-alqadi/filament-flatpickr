@@ -35,6 +35,8 @@ export function attachFooterActions(fp, component) {
     });
 
     footer.appendChild(button);
+
+    return button;
   };
 
   if (clearButton) {
@@ -45,13 +47,33 @@ export function attachFooterActions(fp, component) {
   }
 
   if (todayButton) {
-    addButton(labels.today ?? 'Today', 'fi-fp-footer-btn-primary', () => {
-      const today = new Date();
-      const dates = component.attribs.mode === 'range' ? [today, today] : [today];
+    // A picker without a time gets the start of today: flatpickr compares "now" with a disabled day to the second,
+    // so it would let today through.
+    const today = () => {
+      const now = new Date();
 
-      fp.setDate(dates, true);
-      fp.jumpToDate(today);
+      return fp.config.enableTime ? now : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    };
+
+    const button = addButton(labels.today ?? 'Today', 'fi-fp-footer-btn-primary', () => {
+      const date = today();
+
+      if (!fp.isEnabled(date)) {
+        return;
+      }
+
+      fp.setDate(component.attribs.mode === 'range' ? [date, date] : [date], true);
+      fp.jumpToDate(date);
     });
+
+    // Today can't be picked before minDate, after maxDate or on a disabled day. It is checked whenever the calendar
+    // opens, as today moves on at midnight.
+    const refresh = () => {
+      button.disabled = !fp.isEnabled(today());
+    };
+
+    refresh();
+    fp.config.onOpen.push(refresh);
   }
 
   if (applyButton) {

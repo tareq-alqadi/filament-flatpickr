@@ -6,8 +6,16 @@ import { resolvePresetDate } from '../../resources/js/utils/presets.js';
 import { local } from './mount.js';
 
 describe('resolveLocale', () => {
+  it('keeps a right-to-left range readable with a left-to-right mark before the second date', () => {
+    const arabic = resolveLocale('ar');
+
+    expect(arabic.months).toBe(l10n.ar.months);
+    expect(arabic.rangeSeparator).toBe(`${l10n.ar.rangeSeparator}‎`);
+    expect(resolveLocale('fr').rangeSeparator).toBe(l10n.fr.rangeSeparator);
+  });
+
   it.each([
-    ['ar', 'ar'],
+    ['ru', 'ru'],
     ['pt_BR', 'pt'],
     ['zh-TW', 'zh_tw'],
     ['zh_CN', 'zh'],

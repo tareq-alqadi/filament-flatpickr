@@ -54,6 +54,11 @@ export function buildFlatpickrConfig(component, modalReposition) {
     config.plugins.push(new WeekSelect({}));
   }
 
+  // An inline calendar goes under the field, which Filament clips (.fi-fo-text-input { overflow: hidden }).
+  if (config.inline && !config.static && component.$refs.inlineCalendar) {
+    config.appendTo = component.$refs.inlineCalendar;
+  }
+
   config.onOpen = modalReposition.createOnOpenHook(config.onOpen);
   config.onClose = modalReposition.createOnCloseHook(config.onClose);
 

@@ -76,6 +76,23 @@ it('shows a stored time in the picker format and saves it as a time', function (
         ->and(Flatpickr::dehydratePickerState($twentyFourHour, '14:30'))->toBe('14:30');
 });
 
+it('saves nothing for a time picker given something that is not a time', function () {
+    $component = picker()->time()->use24hr();
+
+    expect(Flatpickr::dehydratePickerState($component, 'not-a-time'))->toBeNull()
+        ->and(Flatpickr::dehydratePickerState($component, '25:00'))->toBeNull()
+        ->and(shown($component, 'not-a-time'))->toBe('not-a-time')
+        ->and(shown(picker()->time(), '2024-01-15 14:30:00'))->toBe('2:30 PM');
+});
+
+it('gives null for a date PHP would roll over', function () {
+    expect(picker()->parseState('2024-02-31'))->toBeNull()
+        ->and(picker()->monthSelect()->parseState('2026-13'))->toBeNull()
+        ->and(picker()->enableTime()->parseState('2024-01-15 25:00:00'))->toBeNull()
+        ->and(picker()->parseState('2024-02-29')->toDateString())->toBe('2024-02-29')
+        ->and(Flatpickr::dehydratePickerState(picker()->monthSelect(), '2026-13'))->toBeNull();
+});
+
 it('keeps the seconds of a time picker with seconds', function () {
     $twelveHour = picker()->time()->enableSeconds();
     $twentyFourHour = picker()->time()->use24hr()->enableSeconds();

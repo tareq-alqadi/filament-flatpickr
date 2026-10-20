@@ -17,11 +17,14 @@
     $packageName = \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName();
     $stylesheetHrefs = [
         \Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-css', $packageName),
+        \Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-field-css', $packageName),
     ];
 
     $usesNativeTheme = $usesNativeTheme();
     $themeAsset = $getThemeAsset();
     $isReadOnly = $isReadOnly();
+    $isStatic = $isStatic();
+    $isInline = $isInline() && ! $isStatic;
     $locale = app()->getLocale();
 
     if ($isMonthSelect()) {
@@ -83,9 +86,8 @@
                 'fi-fo-text-input fi-fp-field',
                 'fi-fp-field-clearable' => $isClearable,
                 'fi-fp-field-clickable' => $isClickable,
-            ]) :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class(array_filter([
-                'overflow-hidden' => ! $isStatic(),
-            ]))">
+                'fi-fp-field-static' => $isStatic,
+            ]) :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())">
             <x-filament::input :attributes="\Filament\Support\prepare_inherited_attributes($getExtraInputAttributeBag())
                 ->merge($extraAlpineAttributes, escape: false)
                 ->merge(
@@ -121,5 +123,9 @@
                 </button>
             @endif
         </x-filament::input.wrapper>
+        @if ($isInline)
+            {{-- An inline calendar is drawn here, under the field: in the field, Filament would clip it. --}}
+            <div x-ref="inlineCalendar" class="fi-fp-inline-calendar"></div>
+        @endif
     </div>
 </x-dynamic-component>

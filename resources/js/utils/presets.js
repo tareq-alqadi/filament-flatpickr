@@ -76,6 +76,42 @@ function parsePresetDate(value, fp) {
 }
 
 /**
+ * The dates a preset picks, kept within minDate and maxDate: "Last 7 days" with a minDate three days ago starts on the
+ * minDate. Null when the picker can't take them: a date that isn't one, is outside the limits or on a disabled day, or
+ * a range wholly outside the limits.
+ */
+export function resolvePresetDates(preset, fp) {
+  let dates = preset.date
+    ? [resolvePresetDate(preset.date, fp)]
+    : [resolvePresetDate(preset.start, fp), resolvePresetDate(preset.end, fp)];
+
+  if (dates.some((date) => !date)) {
+    return null;
+  }
+
+  if (dates.length === 2) {
+    const { minDate, maxDate } = fp.config;
+    let [start, end] = dates;
+
+    if (minDate && start < startOfDay(minDate)) {
+      start = startOfDay(minDate);
+    }
+
+    if (maxDate && end > maxDate) {
+      end = startOfDay(maxDate);
+    }
+
+    if (start > end) {
+      return null;
+    }
+
+    dates = [start, end];
+  }
+
+  return dates.every((date) => fp.isEnabled(date)) ? dates : null;
+}
+
+/**
  * Adds a sidebar of quick date shortcuts to the calendar.
  */
 export function attachPresets(fp, component) {
@@ -96,7 +132,15 @@ export function attachPresets(fp, component) {
 
   sidebar.className = 'fi-fp-presets';
 
-  presets.forEach((preset) => {
+  let isApplyingPreset = false;
+
+  const highlight = (active) => {
+    sidebar.querySelectorAll('.fi-fp-preset-btn').forEach((item) => {
+      item.classList.toggle('fi-fp-preset-active', item === active);
+    });
+  };
+
+  const buttons = presets.map((preset) => {
     const button = document.createElement('button');
 
     button.type = 'button';
@@ -107,22 +151,22 @@ export function attachPresets(fp, component) {
       event.preventDefault();
       event.stopPropagation();
 
-      const dates = (
-        preset.date
-          ? [resolvePresetDate(preset.date, fp)]
-          : [resolvePresetDate(preset.start, fp), resolvePresetDate(preset.end, fp)]
-      ).filter(Boolean);
+      const dates = resolvePresetDates(preset, fp);
 
-      if (!dates.length) {
+      if (!dates) {
         return;
       }
 
-      fp.setDate(dates, true);
-      fp.jumpToDate(dates[0]);
+      isApplyingPreset = true;
 
-      sidebar.querySelectorAll('.fi-fp-preset-btn').forEach((item) => {
-        item.classList.toggle('fi-fp-preset-active', item === button);
-      });
+      try {
+        fp.setDate(dates, true);
+      } finally {
+        isApplyingPreset = false;
+      }
+
+      fp.jumpToDate(dates[0]);
+      highlight(button);
 
       if (fp.config.closeOnSelect) {
         fp.close();
@@ -130,7 +174,27 @@ export function attachPresets(fp, component) {
     });
 
     sidebar.appendChild(button);
+
+    return { button, preset };
   });
+
+  // A preset stays highlighted until the dates change another way, such as a day picked or the field cleared.
+  fp.config.onChange.push(() => {
+    if (!isApplyingPreset) {
+      highlight(null);
+    }
+  });
+
+  // A preset the limits rule out can't be clicked. It is checked whenever the calendar opens, as the presets move on
+  // with today.
+  const refresh = () => {
+    buttons.forEach(({ button, preset }) => {
+      button.disabled = !resolvePresetDates(preset, fp);
+    });
+  };
+
+  refresh();
+  fp.config.onOpen.push(refresh);
 
   fp.calendarContainer.prepend(sidebar);
 }

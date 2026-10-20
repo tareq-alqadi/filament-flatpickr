@@ -41,6 +41,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
     {
         $assets = [
             Css::make('flatpickr-css', $this->flatpickrDistPath('flatpickr.css'))->loadedOnRequest(),
+            Css::make('flatpickr-field-css', __DIR__.'/../resources/css/field.css')->loadedOnRequest(),
             Css::make('month-select-style', $this->flatpickrDistPath('plugins/monthSelect/style.css'))->loadedOnRequest(),
             AlpineComponent::make('flatpickr', __DIR__.'/../resources/js/dist/flatpickr.js')->loadedOnRequest(),
         ];

@@ -1,7 +1,7 @@
 import flatpickr from 'flatpickr';
 import { buildFlatpickrConfig } from './utils/build-config.js';
 import { disableBrowserHints } from './utils/disable-hints.js';
-import { isListMode, parseMonthSelectDate } from './utils/date-helpers.js';
+import { formatSelectedDates, isListMode, parseMonthSelectDate } from './utils/date-helpers.js';
 import { ModalReposition } from './utils/modal-reposition.js';
 import { parseStateDates } from './utils/state-dates.js';
 import { applyThemeMode, currentThemeMode, isDarkMode, watchThemeMode } from './utils/theme.js';
@@ -42,6 +42,20 @@ export default function flatpickrDatepicker({
       return this.fp?.altInput ?? this.$refs.picker;
     },
 
+    /**
+     * The state for what the picker shows, as onChange writes it.
+     */
+    selectedState() {
+      if (!this.fp?.selectedDates.length) {
+        return null;
+      }
+
+      return formatSelectedDates(this.fp.selectedDates, {
+        dateFormat: this.packageConfig.dateFormat,
+        isList: isListMode(this.attribs.mode),
+      });
+    },
+
     clear() {
       this.fp?.clear();
       this.state = null;
@@ -49,6 +63,12 @@ export default function flatpickrDatepicker({
 
     setFlatpickrDate(value) {
       if (!this.fp) {
+        return;
+      }
+
+      // The picker wrote this state itself, so it already shows it. Reading it back could change the selection:
+      // "now" picked by Today becomes midnight, which a disabled day then removes while the state keeps it.
+      if (JSON.stringify(value ?? null) === JSON.stringify(this.selectedState())) {
         return;
       }
 

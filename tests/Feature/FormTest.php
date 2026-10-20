@@ -143,6 +143,20 @@ it('reports a date the picker rules out', function (Closure $field, mixed $state
         '11/01/2024',
         'is invalid',
     ],
+    'a day that does not exist' => [fn () => Flatpickr::make('date')->allowInput(), '2024-02-31', 'valid date'],
+    'a month that does not exist' => [fn () => Flatpickr::make('date')->monthSelect(), '2026-13', 'valid date'],
+    'text that is not a time' => [fn () => Flatpickr::make('date')->time()->allowInput(), 'not-a-time', 'valid date'],
+    'a time that does not exist' => [fn () => Flatpickr::make('date')->time()->use24hr(), '25:00', 'valid date'],
+    'a time within minTime and maxTime' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('09:00')->maxTime('17:00'), '09:00', null],
+    'a time before minTime' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('09:00'), '08:59', 'after or equal to 09:00'],
+    'a 12-hour time after maxTime' => [fn () => Flatpickr::make('date')->time()->maxTime('17:00'), '5:30 PM', 'before or equal to 17:00'],
+    'a time in a span over midnight' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('22:00')->maxTime('06:00'), '23:30', null],
+    'a time outside a span over midnight' => [fn () => Flatpickr::make('date')->time()->use24hr()->minTime('22:00')->maxTime('06:00'), '12:00', 'is invalid'],
+    'a moment with a time before minTime' => [
+        fn () => Flatpickr::make('date')->enableTime()->minTime('09:00'),
+        '2024-01-10 08:00:00',
+        'after or equal to 09:00',
+    ],
 ]);
 
 it('saves each kind of picker', function (Closure $field, mixed $state, mixed $saved) {
@@ -196,6 +210,25 @@ it('links the stylesheet of a flatpickr theme but not of the Filament theme', fu
 
     testForm(fn () => Flatpickr::make('date'))
         ->assertDontSeeHtml('x-ref="themeStylesheet"');
+});
+
+it('loads the field stylesheet with any theme', function (FlatpickrTheme $theme) {
+    testForm(fn () => Flatpickr::make('date')->theme($theme)->clearable()->presets())
+        ->assertSeeHtml('flatpickr-field-css');
+})->with([FlatpickrTheme::FILAMENT, FlatpickrTheme::MATERIAL_BLUE]);
+
+it('lets a static calendar show and gives an inline one a place under the field', function () {
+    testForm(fn () => Flatpickr::make('date')->static())
+        ->assertSeeHtml('fi-fp-field-static')
+        ->assertDontSeeHtml('x-ref="inlineCalendar"');
+
+    testForm(fn () => Flatpickr::make('date')->inline())
+        ->assertSeeHtml('x-ref="inlineCalendar"')
+        ->assertDontSeeHtml('fi-fp-field-static');
+
+    testForm(fn () => Flatpickr::make('date'))
+        ->assertDontSeeHtml('fi-fp-field-static')
+        ->assertDontSeeHtml('x-ref="inlineCalendar"');
 });
 
 it('accepts an empty optional picker', function () {

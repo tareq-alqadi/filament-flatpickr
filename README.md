@@ -43,8 +43,9 @@ Flatpickr::make('sprint_week')->weekSelect();          // a week
 | Range, multiple | An array of `Carbon` dates; cast the attribute to `array` |
 | Time | A string, `"H:i"`, or `"H:i:s"` with `->enableSeconds()` |
 
-A value typed into the picker (with `->allowInput()`) that isn't a date fails validation with Laravel's
-`validation.date` message.
+A value typed into the picker (with `->allowInput()`) that isn't a date, or a time for a time picker, fails validation
+with Laravel's `validation.date` message. So does a date that doesn't exist, like `2024-02-31` or the month `2026-13`,
+which PHP would otherwise roll over into the next month or year.
 
 ### Timezones
 
@@ -105,6 +106,14 @@ A date the calendar wouldn't let the user pick also fails validation on the serv
 `disabledDates()` or `enabledDates()` rules out (`validation.in`). A month picker may pick the month `minDate()` falls
 in, and its days aren't checked.
 
+`->minTime('09:00')` and `->maxTime('17:00')` limit the time of a time picker, and the time of day of a date and time
+picker, in the browser and on the server. A `minTime()` later than the `maxTime()` allows a span over midnight.
+
+Limits set through `->customConfig()` only apply in the browser.
+
+Presets and the Today button follow the limits too: a range preset starting before `minDate()` starts on it, and a
+preset or Today the limits rule out can't be clicked.
+
 ### Shortcuts and buttons
 
 ```php
@@ -141,7 +150,10 @@ Flatpickr::make('date')->theme(FlatpickrTheme::MATERIAL_BLUE);
 
 Set the default for every field with `default_theme` in the config. Flatpickr's own themes switch to its dark theme
 in dark mode. They are global stylesheets, so use one of them per page; the Filament theme only styles its own
-fields and can be mixed with any of them.
+fields and can be mixed with any of them. Presets, footer buttons and the clear button work with every theme.
+
+On a right-to-left page, such as one in Arabic, the Filament theme lays the calendar out right to left: the week
+starts on the right, and a range runs from right to left. Times keep their left-to-right order.
 
 ### Locales
 
@@ -164,6 +176,10 @@ the browser's own date input instead, use `->disableMobile(false)`; these featur
 `inline`, `maxTime`, `minTime`, `minuteIncrement`, `monthSelectorType`, `nextArrow`, `noCalendar`, `position`,
 `prevArrow`, `shorthandCurrentMonth`, `showMonths`, `static`, `use24hr`, `weekNumbers` and `wrap` set the Flatpickr
 option of the same name. `->customConfig([...])` (an array or a closure) is merged over everything the field sets.
+It reaches the browser as JSON, so it can't hold functions such as `onChange` or plugins.
+
+`->inline()` shows the calendar under the field, always open. `->static()` opens it under the field instead of
+floating it over the page, which keeps it in place in scrolling containers.
 
 A `->readOnly()` field doesn't open the calendar.
 
@@ -176,8 +192,11 @@ A `->readOnly()` field doesn't open the calendar.
 - A `dateFormat()` you set is no longer replaced when the picker has a time.
 - A date and time picker's default format pads the seconds (`Y-m-d H:i:S`), and a time picker with
   `->enableSeconds()` saves the seconds picked instead of `:00`.
-- `minDate()`, `maxDate()`, `disabledDates()` and `enabledDates()` are checked on the server too. They are kept as
-  given until the form is built, so a closure is evaluated each time.
+- `minDate()`, `maxDate()`, `disabledDates()`, `enabledDates()`, `minTime()` and `maxTime()` are checked on the server
+  too. The date limits are kept as given until the form is built, so a closure is evaluated each time.
+- A time picker given text that isn't a time, and any picker given a date that doesn't exist, fails validation instead
+  of saving it as it is or rolled over.
+- On a right-to-left page the Filament theme's calendar is laid out right to left.
 - `altInputClass` defaults to empty, so the visible input keeps the field's classes.
 - The placeholder `filament-flatpickr` artisan command and the `Flatpickr::PACKAGE_NAME` constant were removed; use
   `FilamentFlatpickr::getPackageName()`.

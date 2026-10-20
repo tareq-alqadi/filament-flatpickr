@@ -4,12 +4,14 @@ const mounted = [];
 
 /**
  * Starts the Alpine component the way the Blade view does, with a stand-in for Alpine: `$refs`, and a `$watch` on the
- * state that fires when it changes, as `$entangle` does.
+ * state that fires after it changes, in a microtask as Alpine's does. Await `settle()` before checking what a watcher
+ * did.
  */
 export function mount({ state = null, packageConfig = {}, attribs = {}, locale = 'en', themeStylesheet = null } = {}) {
   const input = document.createElement('input');
+  const inlineCalendar = document.createElement('div');
 
-  document.body.appendChild(input);
+  document.body.append(input, inlineCalendar);
 
   const watchers = [];
 
@@ -27,20 +29,40 @@ export function mount({ state = null, packageConfig = {}, attribs = {}, locale =
       target[key] = value;
 
       if (key === 'state' && JSON.stringify(old) !== JSON.stringify(value)) {
-        watchers.forEach((watcher) => watcher(value, old));
+        queueMicrotask(() => watchers.forEach((watcher) => watcher(target.state, old)));
       }
 
       return true;
     },
   });
 
-  data.$refs = { picker: input, themeStylesheet };
+  data.$refs = { picker: input, themeStylesheet, inlineCalendar };
   data.$watch = (key, watcher) => watchers.push(watcher);
 
   component.init();
   mounted.push(component);
 
   return component;
+}
+
+/**
+ * Waits for the state watchers, and anything they set off, to run.
+ */
+export function settle() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Today at midnight, or a number of days from it.
+ */
+export function day(offset = 0) {
+  const now = new Date();
+
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+}
+
+export function ymd(date) {
+  return local(date).slice(0, 10);
 }
 
 export function unmountAll() {

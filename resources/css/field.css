@@ -1,0 +1,217 @@
+/* The field around every picker, whatever the calendar's theme: the clear button, the pointer, right-to-left
+   pages, and room for a static() or inline() calendar. */
+
+/* Clear button. Sized in this stylesheet so it cannot stretch the field. */
+
+.fi-fp-field,
+.fi-fp-field .fi-input-wrp-content-ctn {
+    position: relative;
+}
+
+.fi-fp-field-clickable input.fi-input {
+    cursor: pointer;
+}
+
+.fi-fp-field-clearable input.fi-input {
+    padding-inline-end: 2.25rem;
+}
+
+/* A date reads left to right. In an RTL field, keep that order, sit the value beside the calendar icon, and leave the clear control's space on the left. */
+
+[dir="rtl"] .fi-fp-field input.fi-input {
+    direction: ltr;
+    text-align: right !important;
+    /* Text with Arabic in it, such as a range "2024-01-01 إلى 2024-01-05", still reads right to left. */
+    unicode-bidi: plaintext;
+}
+
+[dir="rtl"] .fi-fp-field-clearable input.fi-input {
+    padding-left: 2.25rem;
+    padding-right: 0.75rem;
+}
+
+.fi-fp-clear-btn {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 0.625rem;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--gray-400, #a1a1aa);
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+
+.fi-fp-clear-btn svg {
+    width: 1rem;
+    height: 1rem;
+    display: block;
+}
+
+.fi-fp-clear-btn:hover {
+    color: var(--gray-600, #52525b);
+}
+
+.dark .fi-fp-clear-btn:hover {
+    color: var(--gray-300, #d4d4d8);
+}
+/* A static() calendar opens inside the field, which Filament clips (.fi-fo-text-input { overflow: hidden }), so the
+   field lets it show below. */
+
+.fi-fo-text-input.fi-fp-field-static,
+.fi-fp-field-static .fi-input-wrp-content-ctn {
+    overflow: visible;
+}
+
+.fi-fp-field-static .flatpickr-wrapper {
+    display: block;
+    width: 100%;
+}
+
+/* An inline() calendar sits under the field rather than in it. */
+
+.fi-fp-inline-calendar .flatpickr-calendar.inline {
+    margin-top: 0.5rem;
+}
+
+/* Presets and footer buttons, with any calendar theme. The calendar grows to fit the sidebar. */
+
+.flatpickr-calendar .fi-fp-main {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Flatpickr places the month arrows against the calendar, which would put the previous one over the presets. */
+.flatpickr-calendar .fi-fp-main .flatpickr-months {
+    position: relative;
+}
+
+.flatpickr-calendar.fi-fp-has-presets.open,
+.flatpickr-calendar.fi-fp-has-presets.inline {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: stretch;
+    width: max-content;
+}
+
+.flatpickr-calendar.fi-fp-has-presets .fi-fp-presets {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 8.25rem;
+    padding-inline-end: 0.625rem;
+    margin-inline-end: 0.625rem;
+    border-inline-end: 1px solid var(--gray-200, #e4e4e7);
+}
+
+.flatpickr-calendar .fi-fp-preset-btn {
+    text-align: start;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    padding: 0.375rem 0.625rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--gray-700, #3f3f46);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 100ms, color 100ms;
+}
+
+.flatpickr-calendar .fi-fp-preset-btn:hover,
+.flatpickr-calendar .fi-fp-preset-btn.fi-fp-preset-active {
+    background: var(--gray-100, #f4f4f5);
+    color: var(--primary-600, #d97706);
+}
+
+/* Footer action bar */
+
+.flatpickr-calendar .fi-fp-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-200, #e4e4e7);
+}
+
+.flatpickr-calendar .fi-fp-footer-btn {
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color 100ms, color 100ms;
+}
+
+.flatpickr-calendar .fi-fp-footer-btn-primary {
+    color: var(--primary-600, #d97706);
+}
+
+.flatpickr-calendar .fi-fp-footer-btn-primary:hover {
+    background: color-mix(in oklab, var(--primary-500, #f59e0b) 12%, transparent);
+}
+
+.flatpickr-calendar .fi-fp-footer-btn-muted {
+    color: var(--gray-500, #71717a);
+}
+
+.flatpickr-calendar .fi-fp-footer-btn-muted:hover {
+    background: var(--gray-100, #f4f4f5);
+    color: var(--gray-800, #27272a);
+}
+
+/* A preset or Today that the date limits rule out. */
+
+.flatpickr-calendar .fi-fp-preset-btn:disabled,
+.flatpickr-calendar .fi-fp-footer-btn:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Presets and footer buttons in dark mode */
+
+.dark .flatpickr-calendar.fi-fp-has-presets .fi-fp-presets,
+.dark .flatpickr-calendar .fi-fp-footer {
+    border-color: color-mix(in oklab, #ffffff 10%, transparent);
+}
+
+.dark .flatpickr-calendar .fi-fp-preset-btn {
+    color: var(--gray-300, #d4d4d8);
+}
+
+.dark .flatpickr-calendar .fi-fp-preset-btn:hover,
+.dark .flatpickr-calendar .fi-fp-preset-btn.fi-fp-preset-active {
+    background: color-mix(in oklab, #ffffff 8%, transparent);
+    color: var(--primary-400, #fbbf24);
+}
+
+.dark .flatpickr-calendar .fi-fp-footer-btn-primary {
+    color: var(--primary-400, #fbbf24);
+}
+
+.dark .flatpickr-calendar .fi-fp-footer-btn-primary:hover {
+    background: color-mix(in oklab, var(--primary-400, #fbbf24) 14%, transparent);
+}
+
+.dark .flatpickr-calendar .fi-fp-footer-btn-muted {
+    color: var(--gray-400, #a1a1aa);
+}
+
+.dark .flatpickr-calendar .fi-fp-footer-btn-muted:hover {
+    background: color-mix(in oklab, #ffffff 8%, transparent);
+    color: var(--gray-100, #f4f4f5);
+}
