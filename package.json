@@ -3,7 +3,9 @@
     "type": "module",
     "scripts": {
         "dev": "node bin/build.js --dev",
-        "build": "node bin/build.js"
+        "dev:scripts": "node bin/build.js --dev",
+        "build": "node bin/build.js",
+        "build:scripts": "node bin/build.js"
     },
     "devDependencies": {
         "esbuild": "^0.28.2",
