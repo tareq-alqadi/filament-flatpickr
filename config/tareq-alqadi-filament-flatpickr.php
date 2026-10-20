@@ -3,5 +3,5 @@
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 
 return [
-    'default_theme' => FlatpickrTheme::DEFAULT,
+    'default_theme' => FlatpickrTheme::FILAMENT,
 ];

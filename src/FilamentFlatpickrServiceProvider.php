@@ -24,6 +24,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
             ->name('tareq-alqadi-filament-flatpickr')
             ->hasConfigFile()
             ->hasViews()
+            ->hasTranslations()
             ->hasCommand(FilamentFlatpickrCommand::class);
     }
 
@@ -48,7 +49,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
 
         foreach (FlatpickrTheme::cases() as $theme) {
             $filename = match ($theme) {
-                FlatpickrTheme::DEFAULT => 'light.css',
+                FlatpickrTheme::DEFAULT, FlatpickrTheme::FILAMENT => 'filament.css',
                 default => "{$theme->value}.css",
             };
 

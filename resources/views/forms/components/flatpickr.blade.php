@@ -19,9 +19,17 @@
         \Filament\Support\Facades\FilamentAsset::getStyleHref('flatpickr-css', $packageName),
     ];
 
+    $usesNativeTheme = $usesNativeTheme();
+
     if ($isMonthSelect()) {
         $stylesheetHrefs[] = \Filament\Support\Facades\FilamentAsset::getStyleHref('month-select-style', $packageName);
     }
+
+    if ($usesNativeTheme) {
+        $stylesheetHrefs[] = $getThemeAsset();
+    }
+
+    $isClearable = $isClearable() && ! $isDisabled && ! $isReadOnly();
 
     $attribs = [
         'disabled' => $isDisabled,
@@ -29,10 +37,16 @@
         'themeAsset' => $getThemeAsset(),
         'lightThemeAsset' => $getLightThemeAsset(),
         'darkThemeAsset' => $getDarkThemeAsset(),
+        'nativeTheme' => $usesNativeTheme,
         'monthSelect' => $isMonthSelect(),
         'weekSelect' => $isWeekSelect(),
         'mode' => $getMode(),
         'rangePicker' => $isRangePicker(),
+        'presets' => $getPresets(),
+        'todayButton' => $hasTodayButton(),
+        'clearButton' => $hasClearButton(),
+        'applyButton' => $hasApplyButton(),
+        'labels' => $getActionLabels(),
     ];
 @endphp
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
@@ -41,7 +55,7 @@
                 state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$statePath}')") }},
                 packageConfig: @js($config),
                 attribs: @js($attribs),
-                locale: '{{ config('app.locale') }}'
+                locale: '{{ app()->getLocale() }}'
             })"
         wire:ignore
         wire:key="{{ $livewireKey }}.{{ substr(md5(serialize([$getDisabledDates(), $isDisabled, $isReadOnly(), $getMinDate(), $getMaxDate(), $getMode(), $isRangePicker(), $isMonthSelect()])), 0, 64) }}"
@@ -49,14 +63,19 @@
         x-load
         x-load-css="@js($stylesheetHrefs)"
         x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('flatpickr', package: \TareqAlqadi\FilamentFlatpickr\FilamentFlatpickr::getPackageName()) }}">
-        <link
-            x-ref="themeStylesheet"
-            rel="stylesheet"
-            href="{{ $getThemeAsset() }}"
-        />
+        @unless ($usesNativeTheme)
+            <link
+                x-ref="themeStylesheet"
+                rel="stylesheet"
+                href="{{ $getThemeAsset() }}"
+            />
+        @endunless
         <x-filament::input.wrapper :disabled="$isDisabled" :inline-prefix="$isPrefixInline" :inline-suffix="$isSuffixInline" :prefix="$prefixLabel"
             :prefix-actions="$prefixActions" :prefix-icon="$prefixIcon" :suffix="$suffixLabel" :suffix-actions="$suffixActions" :suffix-icon="$suffixIcon"
-            :valid="!$errors->has($statePath)" class="fi-fo-text-input" :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class(array_filter([
+            :valid="!$errors->has($statePath)" @class([
+                'fi-fo-text-input fi-fp-field',
+                'fi-fp-field-clearable' => $isClearable,
+            ]) :attributes="\Filament\Support\prepare_inherited_attributes($getExtraAttributeBag())->class(array_filter([
                 'overflow-hidden' => ! $isStatic(),
             ]))">
             <x-filament::input :attributes="\Filament\Support\prepare_inherited_attributes($getExtraInputAttributeBag())
@@ -74,12 +93,26 @@
                         'inlineSuffix' =>
                             $isSuffixInline && (count($suffixActions) || $suffixIcon || filled($suffixLabel)),
                         'placeholder' => $getPlaceholder(),
+                        'class' => $isAllowInput() ? null : 'cursor-pointer',
                         'readonly' => $isReadOnly(),
                         'required' => $isRequired() && !$isConcealed,
                         'type' => 'text',
                     ],
                     escape: false,
                 )" />
+            @if ($isClearable)
+                <button
+                    type="button"
+                    x-show="state !== null && state !== '' && (! Array.isArray(state) || state.length > 0)"
+                    x-cloak
+                    x-on:click.stop="clear()"
+                    title="{{ __('tareq-alqadi-filament-flatpickr::flatpickr.clear') }}"
+                    aria-label="{{ __('tareq-alqadi-filament-flatpickr::flatpickr.clear') }}"
+                    class="fi-fp-clear-btn"
+                >
+                    {{ svg('heroicon-m-x-mark', 'h-4 w-4') }}
+                </button>
+            @endif
         </x-filament::input.wrapper>
     </div>
 </x-dynamic-component>

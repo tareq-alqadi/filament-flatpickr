@@ -1,6 +1,9 @@
 import MonthSelect from 'flatpickr/dist/esm/plugins/monthSelect';
 import WeekSelect from 'flatpickr/dist/esm/plugins/weekSelect/weekSelect';
+import { chainHook } from './chain-hook.js';
 import { formatSelectedDates, getMonthSelectDefaultDate } from './date-helpers.js';
+import { attachFooterActions } from './footer-actions.js';
+import { attachPresets } from './presets.js';
 
 export function buildFlatpickrConfig(component, modalReposition) {
   const { attribs, packageConfig, locale } = component;
@@ -36,7 +39,8 @@ export function buildFlatpickrConfig(component, modalReposition) {
         shorthand: false,
         dateFormat: packageConfig.dateFormat,
         altInput: true,
-        altFormat: 'F, Y',
+        altFormat: packageConfig.altFormat || 'F Y',
+        altInputClass: packageConfig.altInputClass,
         theme: component.mode,
       }),
     );
@@ -52,6 +56,11 @@ export function buildFlatpickrConfig(component, modalReposition) {
 
   config.onOpen = modalReposition.createOnOpenHook(config.onOpen);
   config.onClose = modalReposition.createOnCloseHook(config.onClose);
+
+  config.onReady = chainHook(config.onReady, (_selectedDates, _dateStr, instance) => {
+    attachPresets(instance, component);
+    attachFooterActions(instance, component);
+  });
 
   return config;
 }

@@ -5,6 +5,7 @@ namespace TareqAlqadi\FilamentFlatpickr\Enums;
 enum FlatpickrTheme: string
 {
     case DEFAULT = 'default';
+    case FILAMENT = 'filament';
     case DARK = 'dark';
     case LIGHT = 'light';
     case MATERIAL_BLUE = 'material_blue';

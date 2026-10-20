@@ -1,7 +1,7 @@
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/l10n/ar';
-
 import { buildFlatpickrConfig } from './utils/build-config.js';
+import { disableBrowserHints } from './utils/disable-hints.js';
 import { parseMonthSelectDate } from './utils/date-helpers.js';
 import { ModalReposition } from './utils/modal-reposition.js';
 import {
@@ -43,6 +43,15 @@ export default function flatpickrDatepicker({
       return this.attribs.monthSelect === true;
     },
 
+    inputElement() {
+      return this.fp?.altInput ?? this.$refs.picker;
+    },
+
+    clear() {
+      this.fp?.clear();
+      this.state = null;
+    },
+
     setFlatpickrDate(value) {
       if (!this.fp) {
         return;
@@ -72,26 +81,30 @@ export default function flatpickrDatepicker({
       modalReposition = new ModalReposition();
 
       const config = buildFlatpickrConfig(this, modalReposition);
+      const allowTyping = this.packageConfig.allowInput === true && !this.$refs.picker.hasAttribute('readonly');
       this.fp = flatpickr(this.$refs.picker, config);
+      disableBrowserHints(this.fp, { allowTyping });
 
       if (!this.fp.config.static && !this.fp.config.inline) {
         modalReposition.attach(this.fp);
       }
 
+      const input = this.inputElement();
+
       onInput = () => {
-        if (!this.$refs.picker.value?.trim()) {
+        if (!input.value?.trim()) {
           this.state = null;
         }
       };
 
       onBlur = () => {
-        if (!this.$refs.picker.value?.trim()) {
+        if (!input.value?.trim()) {
           this.state = null;
         }
       };
 
-      this.$refs.picker.addEventListener('input', onInput);
-      this.$refs.picker.addEventListener('blur', onBlur);
+      input.addEventListener('input', onInput);
+      input.addEventListener('blur', onBlur);
 
       this.$nextTick(() => {
         applyDarkTheme(this);
@@ -108,9 +121,11 @@ export default function flatpickrDatepicker({
     },
 
     destroy() {
-      if (this.$refs.picker) {
-        this.$refs.picker.removeEventListener('input', onInput);
-        this.$refs.picker.removeEventListener('blur', onBlur);
+      const input = this.inputElement();
+
+      if (input) {
+        input.removeEventListener('input', onInput);
+        input.removeEventListener('blur', onBlur);
       }
 
       onInput = null;

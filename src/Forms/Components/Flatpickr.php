@@ -58,11 +58,11 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected bool $enableTime = false;
 
-    protected ?string $dateFormat = 'Y m-d';
+    protected ?string $dateFormat = 'Y-m-d';
 
     protected FlatpickrTheme $theme = FlatpickrTheme::DEFAULT;
 
-    protected ?string $altInputClass = '';
+    protected ?string $altInputClass = 'fi-input';
 
     protected bool $allowInput = false;
 
@@ -130,14 +130,24 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected bool $closeOnSelect = true;
 
+    protected bool|Closure $isClearable = false;
+
+    protected bool|array|Closure|null $presets = null;
+
+    protected bool|Closure $showTodayButton = false;
+
+    protected bool|Closure $showClearButton = false;
+
+    protected bool|Closure $showApplyButton = false;
+
     public function getConfig(): array
     {
         if ($this->isEnableTime()) {
             if (!Str::of($this->getDateFormat())->contains('H', ignoreCase: true)) {
-                $this->dateFormat('Y m-d H:i:s');
+                $this->dateFormat('Y-m-d H:i:s');
             }
             if (!Str::of($this->getAltFormat())->contains('H', ignoreCase: true)) {
-                $this->altFormat('F j Y H:i K');
+                $this->altFormat('F j, Y H:i K');
             }
         }
         if ($this->isRangePicker()) {
@@ -158,7 +168,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             $this->range(false);
             $this->timezone('UTC');
             $this->dateFormat('Y-m');
-            $this->altFormat('F J');
+            $this->altFormat('F Y');
             $this->altInput();
         } elseif ($this->isWeekSelect()) {
             $this->mode(FlatpickrMode::SINGLE);
@@ -180,7 +190,7 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
             'enableTime' => $this->enableTime,
             'dateFormat' => $this->dateFormat,
             'theme' => $this->theme->value,
-            'altInputClass' => $this->altInputClass,
+            'altInputClass' => $this->getAltInputClass(),
             'allowInput' => $this->allowInput,
             'allowInvalidPreload' => $this->allowInvalidPreload,
             'ariaDateFormat' => $this->ariaDateFormat,
@@ -238,10 +248,12 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         parent::setUp();
         $this->prefixIcon('heroicon-o-calendar-days');
 
-        $this->prevArrow(svg('heroicon-m-arrow-left')->toHtml());
-        $this->nextArrow(svg('heroicon-m-arrow-right')->toHtml());
+        $this->autocomplete(false);
 
-        $this->theme(FlatpickrTheme::MATERIAL_BLUE);
+        $this->prevArrow(svg('heroicon-m-chevron-left')->toHtml());
+        $this->nextArrow(svg('heroicon-m-chevron-right')->toHtml());
+
+        $this->theme(config('tareq-alqadi-filament-flatpickr.default_theme', FlatpickrTheme::FILAMENT));
 
         $this->dehydrateStateUsing(static function (Flatpickr $component, $state) {
             return static::dehydratePickerState($component, $state);
@@ -470,7 +482,13 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function getAltInputClass(): ?string
     {
-        return $this->altInputClass;
+        $classes = array_filter([
+            $this->altInputClass,
+            $this->isAllowInput() ? null : 'cursor-pointer',
+            $this->isClearable() ? 'pe-9' : null,
+        ]);
+
+        return implode(' ', $classes);
     }
 
     public function allowInput(bool $allowInput = true): static
@@ -989,6 +1007,166 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
         return $this;
     }
 
+    /**
+     * Shows an inline button that clears the picked value.
+     */
+    public function clearable(bool|Closure $condition = true): static
+    {
+        $this->isClearable = $condition;
+
+        return $this;
+    }
+
+    public function isClearable(): bool
+    {
+        return (bool) $this->evaluate($this->isClearable);
+    }
+
+    /**
+     * Shows quick date shortcuts beside the calendar. `true` uses the defaults for the picker mode; an array sets
+     * custom shortcuts, each `['label' => ..., 'date' => ...]` for one date or `['label' => ..., 'start' => ...,
+     * 'end' => ...]` for a range.
+     *
+     * @param  bool|array<int, array<string, mixed>>|Closure  $presets
+     */
+    public function presets(bool|array|Closure $presets = true): static
+    {
+        $this->presets = $presets;
+
+        return $this;
+    }
+
+    public function hasPresets(): bool
+    {
+        return $this->evaluate($this->presets) !== null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getPresets(): array
+    {
+        $presets = $this->evaluate($this->presets);
+
+        if ($presets === null) {
+            return [];
+        }
+
+        if (is_array($presets)) {
+            return array_values($presets);
+        }
+
+        return $this->isRangePicker() ? $this->defaultRangePresets() : $this->defaultSinglePresets();
+    }
+
+    /**
+     * Adds a "Today" shortcut to the calendar footer.
+     */
+    public function todayButton(bool|Closure $condition = true): static
+    {
+        $this->showTodayButton = $condition;
+
+        return $this;
+    }
+
+    public function hasTodayButton(): bool
+    {
+        return (bool) $this->evaluate($this->showTodayButton);
+    }
+
+    /**
+     * Adds a "Clear" shortcut to the calendar footer.
+     */
+    public function clearButton(bool|Closure $condition = true): static
+    {
+        $this->showClearButton = $condition;
+
+        return $this;
+    }
+
+    public function hasClearButton(): bool
+    {
+        return (bool) $this->evaluate($this->showClearButton);
+    }
+
+    /**
+     * Adds an "Apply" button to the calendar footer that closes the calendar, useful with a time or multiple picker.
+     */
+    public function applyButton(bool|Closure $condition = true): static
+    {
+        $this->showApplyButton = $condition;
+
+        return $this;
+    }
+
+    public function hasApplyButton(): bool
+    {
+        return (bool) $this->evaluate($this->showApplyButton);
+    }
+
+    /**
+     * Adds the Today, Clear and Apply buttons to the calendar footer at once.
+     */
+    public function footerActions(bool|Closure $condition = true): static
+    {
+        $this->showTodayButton = $condition;
+        $this->showClearButton = $condition;
+        $this->showApplyButton = $condition;
+
+        return $this;
+    }
+
+    public function hasFooterActions(): bool
+    {
+        return $this->hasTodayButton() || $this->hasClearButton() || $this->hasApplyButton();
+    }
+
+    /**
+     * @return array{today: string, clear: string, apply: string}
+     */
+    public function getActionLabels(): array
+    {
+        return [
+            'today' => $this->translate('today'),
+            'clear' => $this->translate('clear'),
+            'apply' => $this->translate('apply'),
+        ];
+    }
+
+    protected function translate(string $key): string
+    {
+        return __("tareq-alqadi-filament-flatpickr::flatpickr.{$key}");
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    protected function defaultSinglePresets(): array
+    {
+        return [
+            ['label' => $this->translate('today'), 'date' => 'today'],
+            ['label' => $this->translate('tomorrow'), 'date' => 'tomorrow'],
+            ['label' => $this->translate('in_7_days'), 'date' => 'in_7_days'],
+            ['label' => $this->translate('next_month'), 'date' => 'next_month'],
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    protected function defaultRangePresets(): array
+    {
+        return [
+            ['label' => $this->translate('today'), 'start' => 'today', 'end' => 'today'],
+            ['label' => $this->translate('yesterday'), 'start' => 'yesterday', 'end' => 'yesterday'],
+            ['label' => $this->translate('last_7_days'), 'start' => 'last_7_days', 'end' => 'today'],
+            ['label' => $this->translate('last_30_days'), 'start' => 'last_30_days', 'end' => 'today'],
+            ['label' => $this->translate('this_month'), 'start' => 'start_of_month', 'end' => 'end_of_month'],
+            ['label' => $this->translate('last_month'), 'start' => 'start_of_last_month', 'end' => 'end_of_last_month'],
+            ['label' => $this->translate('this_year'), 'start' => 'start_of_year', 'end' => 'end_of_year'],
+        ];
+    }
+
     public function getTheme(): string
     {
         return $this->theme?->value;
@@ -996,11 +1174,15 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     public function getThemeAsset(): string
     {
-        if ($this->getTheme() === FlatpickrTheme::DEFAULT->value) {
-            $this->theme(FlatpickrTheme::LIGHT);
-        }
-
         return $this->resolveThemeStylesheetHref($this->getTheme());
+    }
+
+    /**
+     * The Filament theme handles dark mode itself, so it needs no separate dark stylesheet.
+     */
+    public function usesNativeTheme(): bool
+    {
+        return in_array($this->getTheme(), [FlatpickrTheme::DEFAULT->value, FlatpickrTheme::FILAMENT->value], true);
     }
 
     public function getDarkThemeAsset(): string
@@ -1021,8 +1203,8 @@ class Flatpickr extends Field implements Contracts\CanBeLengthConstrained
 
     protected function resolveThemeStylesheetHref(string $theme): string
     {
-        $resolved = $theme === FlatpickrTheme::DEFAULT->value
-            ? FlatpickrTheme::LIGHT->value
+        $resolved = in_array($theme, [FlatpickrTheme::DEFAULT->value, FlatpickrTheme::FILAMENT->value], true)
+            ? FlatpickrTheme::FILAMENT->value
             : $theme;
 
         return FilamentAsset::getStyleHref(

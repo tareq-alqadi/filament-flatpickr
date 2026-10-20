@@ -30,8 +30,12 @@ export function setThemeStylesheet(component, href) {
   }
 }
 
+export function usesNativeTheme(component) {
+  return component.attribs.nativeTheme === true;
+}
+
 export function applyDarkTheme(component) {
-  if (component.themeMode !== 'dark') {
+  if (usesNativeTheme(component) || component.themeMode !== 'dark') {
     return;
   }
 
@@ -41,6 +45,10 @@ export function applyDarkTheme(component) {
 export function createThemeChangeHandler(component) {
   return (event) => {
     component.mode = event.detail.dark ? 'dark' : 'light';
+
+    if (usesNativeTheme(component)) {
+      return;
+    }
 
     setThemeStylesheet(
       component,
