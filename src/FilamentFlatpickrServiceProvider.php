@@ -8,7 +8,6 @@ use Filament\Support\Assets\Css;
 use Filament\Support\Facades\FilamentAsset;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use TareqAlqadi\FilamentFlatpickr\Commands\FilamentFlatpickrCommand;
 use TareqAlqadi\FilamentFlatpickr\Enums\FlatpickrTheme;
 
 class FilamentFlatpickrServiceProvider extends PackageServiceProvider
@@ -24,8 +23,7 @@ class FilamentFlatpickrServiceProvider extends PackageServiceProvider
             ->name('tareq-alqadi-filament-flatpickr')
             ->hasConfigFile()
             ->hasViews()
-            ->hasTranslations()
-            ->hasCommand(FilamentFlatpickrCommand::class);
+            ->hasTranslations();
     }
 
     public function packageBooted(): void
