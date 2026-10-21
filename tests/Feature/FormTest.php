@@ -234,9 +234,16 @@ it('requires a range to hold a date', function () {
 it('sends the locale and translated labels', function () {
     app()->setLocale('ar');
 
-    testForm(fn () => DatePicker::make('date')->clearable()->footerActions())
+    $html = testForm(fn () => DatePicker::make('date')->clearable()->footerActions())
         ->assertSeeHtml('aria-label="مسح"')
-        ->assertSeeHtml('يناير'); // يناير, January in Arabic, in the locale JSON.
+        ->html();
+
+    // يناير, January in Arabic, in the locale JSON. Laravel 13's @js writes it as it is; Laravel 12's escapes it inside
+    // a JSON.parse() string, with its backslash escaped too.
+    $escaped = trim(json_encode('يناير'), '"');
+
+    expect(collect(['يناير', $escaped, addslashes($escaped)])->contains(fn (string $text): bool => str_contains($html, $text)))
+        ->toBeTrue();
 });
 
 it('hides the clear button on a read-only or disabled field', function (Closure $picker) {
