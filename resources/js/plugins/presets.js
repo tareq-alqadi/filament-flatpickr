@@ -2,10 +2,11 @@ import { addDays, isDate, startOfDay } from '../utils/dates.js';
 import { ensureCalendarMainWrapper } from '../utils/calendar-layout.js';
 
 /**
- * Turns a preset token, or a date in the state format, into a local Date. A day such as "2024-12-25" is read where
- * the user is: `new Date()` would read it as midnight UTC, which is the day before west of UTC.
+ * Turns a preset token, or a date in the state format, into a local Date. A token counts from the day `now` is on. A
+ * day such as "2024-12-25" is read where the user is: `new Date()` would read it as midnight UTC, which is the day
+ * before west of UTC.
  */
-export function resolvePresetDate(value, fp) {
+export function resolvePresetDate(value, fp, now = new Date()) {
   if (value instanceof Date) {
     return value;
   }
@@ -14,7 +15,7 @@ export function resolvePresetDate(value, fp) {
     return null;
   }
 
-  const today = startOfDay(new Date());
+  const today = startOfDay(now);
   const year = today.getFullYear();
   const month = today.getMonth();
 
@@ -60,10 +61,10 @@ export function resolvePresetDate(value, fp) {
  * minDate. Null when the picker can't take them: a date that isn't one, is outside the limits or on a disabled day, or
  * a range wholly outside the limits.
  */
-export function resolvePresetDates(preset, fp) {
+export function resolvePresetDates(preset, fp, now = new Date()) {
   let dates = preset.date
-    ? [resolvePresetDate(preset.date, fp)]
-    : [resolvePresetDate(preset.start, fp), resolvePresetDate(preset.end, fp)];
+    ? [resolvePresetDate(preset.date, fp, now)]
+    : [resolvePresetDate(preset.start, fp, now), resolvePresetDate(preset.end, fp, now)];
 
   if (dates.some((date) => !date)) {
     return null;
@@ -94,8 +95,9 @@ export function resolvePresetDates(preset, fp) {
 /**
  * A sidebar of quick picks beside the calendar. A preset stays highlighted until the dates change another way, and
  * one the limits rule out can't be clicked: that is checked whenever the calendar opens, as presets move on with today.
+ * `now` gives the moment the tokens count from.
  */
-export function presetsPlugin(presets) {
+export function presetsPlugin(presets, now = () => new Date()) {
   return (fp) => {
     let buttons = [];
     let isApplying = false;
@@ -106,12 +108,12 @@ export function presetsPlugin(presets) {
 
     const refresh = () => {
       buttons.forEach(({ button, preset }) => {
-        button.disabled = !resolvePresetDates(preset, fp);
+        button.disabled = !resolvePresetDates(preset, fp, now());
       });
     };
 
     const apply = (preset, button) => {
-      const dates = resolvePresetDates(preset, fp);
+      const dates = resolvePresetDates(preset, fp, now());
 
       if (!dates) {
         return;

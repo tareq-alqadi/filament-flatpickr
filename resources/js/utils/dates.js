@@ -29,3 +29,36 @@ export function startOfWeek(date, firstDayOfWeek = 0) {
 
   return addDays(start, -((start.getDay() - firstDayOfWeek + 7) % 7));
 }
+
+/**
+ * Now as the clock reads in a timezone, as a local date: the calendar draws local dates, so 09:00 in the timezone is
+ * drawn as 09:00 wherever the user is. Now where the user is when there is no timezone, or the browser doesn't know it.
+ */
+export function nowIn(timezone) {
+  const now = new Date();
+
+  if (!timezone) {
+    return now;
+  }
+
+  let parts;
+
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+    }).formatToParts(now);
+  } catch {
+    return now;
+  }
+
+  const part = (type) => Number(parts.find((entry) => entry.type === type).value);
+
+  return new Date(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'));
+}

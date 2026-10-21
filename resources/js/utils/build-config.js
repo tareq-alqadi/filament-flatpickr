@@ -5,6 +5,7 @@ import { followFieldPlugin } from '../plugins/follow-field.js';
 import { footerActionsPlugin } from '../plugins/footer-actions.js';
 import { presetsPlugin } from '../plugins/presets.js';
 import { textDeletedPlugin } from '../plugins/text-deleted.js';
+import { nowIn } from './dates.js';
 import { resolveLocale } from './locale.js';
 import { datesFromState, sameDates, stateFromDates } from './state.js';
 import { createStrictDateParser } from './strict-parser.js';
@@ -13,9 +14,13 @@ import { createStrictDateParser } from './strict-parser.js';
  * The options flatpickr is created with: the field's, which the server sends as JSON, the plugins for what the field
  * adds to the calendar, and the hook that writes the picked dates to the state.
  */
-export function buildFlatpickrConfig(component, { locale, firstDayOfWeek }) {
+export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, timezone }) {
   const { kind, config: options } = component;
   const l10n = resolveLocale(options.locale ?? locale, { firstDayOfWeek });
+
+  // Today and the presets count from now in the state's timezone, as the server does for limits such as "today": the
+  // user's clock would make Today a moment hours away from now, or another day.
+  const now = () => nowIn(timezone);
 
   // In the order their hooks run. The month and week plugins draw the calendar the others add to.
   const plugins = [];
@@ -40,11 +45,11 @@ export function buildFlatpickrConfig(component, { locale, firstDayOfWeek }) {
   }
 
   if (component.presets?.length) {
-    plugins.push(presetsPlugin(component.presets));
+    plugins.push(presetsPlugin(component.presets, now));
   }
 
   if (Object.values(component.footerActions ?? {}).some(Boolean)) {
-    plugins.push(footerActionsPlugin(component.footerActions, kind));
+    plugins.push(footerActionsPlugin(component.footerActions, kind, now));
   }
 
   return {

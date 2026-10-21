@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * Reads dates without PHP's rollover, which reads "2024-02-31" as 2 March, "2026-13" as January 2027 and "25:00" as
- * 1:00 the next day. A date that doesn't exist gives null.
+ * 1:00 the next day. A date that doesn't exist, or a time the timezone's clocks skip, gives null.
  */
 final class StrictDate
 {
@@ -18,7 +18,14 @@ final class StrictDate
      */
     public static function fromFormat(string $format, string $value, string $timezone): ?CarbonInterface
     {
-        return self::attempt(fn (): ?CarbonInterface => Carbon::createFromFormat('!'.$format, $value, $timezone) ?: null);
+        $date = self::attempt(fn (): ?CarbonInterface => Carbon::createFromFormat('!'.$format, $value, $timezone) ?: null);
+
+        // A time the clocks skip, such as 02:30 when New York moves to summer time, would be read as an hour later.
+        // Read in UTC, which skips nothing, it shows the same in the format. A day whose midnight is skipped, as in
+        // Beirut, starts at 01:00, which a format without a time doesn't show.
+        $clock = $date ? Carbon::createFromFormat('!'.$format, $value, 'UTC') : null;
+
+        return ($clock && ($clock->format($format) === $date->format($format))) ? $date : null;
     }
 
     /**

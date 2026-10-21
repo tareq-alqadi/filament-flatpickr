@@ -34,6 +34,17 @@ describe('a stored value in the browser', function () {
         expect(DatePicker::make('date')->toState('2024-01-14T21:00:00.000000Z'))->toBe('2024-01-15');
     });
 
+    it('is the day a date object shows in its own timezone', function () {
+        // 01:30 on 21 October in Hebron, still the 20th in UTC.
+        freezeAt('2026-10-20 22:30:00');
+
+        expect(DatePicker::make('date')->toState(Carbon::today('Asia/Hebron')))->toBe('2026-10-21')
+            ->and(DatePicker::make('date')->toState(Carbon::now('Asia/Hebron')))->toBe('2026-10-21')
+            ->and(DateRangePicker::make('date')->toState([Carbon::today('Asia/Hebron'), Carbon::today('Asia/Hebron')->addDay()]))->toBe(['2026-10-21', '2026-10-22'])
+            ->and(MonthPicker::make('date')->toState(Carbon::parse('2026-11-01', 'Asia/Hebron')))->toBe('2026-11-01')
+            ->and(DateTimePicker::make('date')->toState(Carbon::today('Asia/Hebron')))->toBe('2026-10-20 21:00:00');
+    });
+
     it('is a moment in the picker timezone', function () {
         $picker = DateTimePicker::make('date')->timezone('America/New_York');
 
@@ -126,6 +137,23 @@ it('only reads what the browser holds in the state format', function () {
         ->and(DateTimePicker::make('date')->parsePicked('2024-01-15 25:00:00'))->toBeNull()
         ->and(MonthPicker::make('date')->parsePicked('2026-13-01'))->toBeNull()
         ->and(DatePicker::make('date')->parsePicked('2024-02-29')[0]->toDateString())->toBe('2024-02-29');
+});
+
+it('does not read a time the clocks skip in the picker timezone', function () {
+    $picker = DateTimePicker::make('date')->timezone('America/New_York');
+
+    expect($picker->parsePicked('2026-03-08 02:30:00'))->toBeNull()
+        ->and($picker->parsePicked('2026-03-08 03:30:00')[0]->format('Y-m-d H:i:s'))->toBe('2026-03-08 03:30:00')
+        ->and($picker->parsePicked('2026-11-01 01:30:00'))->not->toBeNull();
+});
+
+it('reads a day whose midnight the clocks skip', function () {
+    // Beirut moves to summer time at midnight on 29 March 2026.
+    appTimezone('Asia/Beirut');
+
+    expect(DatePicker::make('date')->parsePicked('2026-03-29')[0]->toDateString())->toBe('2026-03-29')
+        ->and(DatePicker::make('date')->fromState('2026-03-29'))->toBe('2026-03-29')
+        ->and(DatePicker::make('date')->toState('2026-03-29'))->toBe('2026-03-29');
 });
 
 it('round-trips through the state cast', function () {

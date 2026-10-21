@@ -132,6 +132,7 @@ it('reports a value that is not a date', function (Closure $picker, mixed $state
     'a day in another format' => [fn () => DatePicker::make('date'), '15/01/2024'],
     'a day that does not exist' => [fn () => DatePicker::make('date'), '2024-02-31'],
     'a time that does not exist' => [fn () => TimePicker::make('date'), '25:00:00'],
+    'a time the clocks skip' => [fn () => DateTimePicker::make('date')->timezone('America/New_York'), '2026-03-08 02:30:00'],
     'a range with an end that is not a date' => [fn () => DateRangePicker::make('date'), ['2024-01-01', 'nope']],
     'a range of three days' => [fn () => DateRangePicker::make('date'), ['2024-01-01', '2024-01-02', '2024-01-03']],
     'a list for a single picker' => [fn () => DatePicker::make('date'), ['2024-01-01']],

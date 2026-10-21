@@ -230,6 +230,28 @@ describe('Today', () => {
     }
   });
 
+  it("picks now in the timezone of the state, not the user's", async () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 9, 21, 22, 34, 31), toFake: ['Date'] });
+
+    try {
+      // A day apart, so one of them is not where the user is.
+      const ahead = mount({ kind: 'datetime', timezone: 'Pacific/Kiritimati', footerActions: { today: 'Today' } });
+      const behind = mount({ kind: 'datetime', timezone: 'Pacific/Honolulu', footerActions: { today: 'Today' } });
+      const date = mount({ timezone: 'Pacific/Kiritimati', footerActions: { today: 'Today' } });
+
+      todayButton(ahead).click();
+      todayButton(behind).click();
+      todayButton(date).click();
+      await settle();
+
+      expect(ahead.state).toBe('2026-10-22 12:34:31');
+      expect(behind.state).toBe('2026-10-21 12:34:31');
+      expect(date.state).toBe('2026-10-22');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('can not pick today before minDate or after maxDate', () => {
     const footerActions = { today: 'Today' };
 

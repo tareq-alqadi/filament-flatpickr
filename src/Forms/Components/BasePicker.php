@@ -373,14 +373,17 @@ abstract class BasePicker extends Field
     /**
      * Reads a value given in code or stored: a date object, text in format(), or anything Carbon reads, in the app's
      * timezone. It gives the moment in the picker's timezone for a date and time picker, the start of the day for a
-     * date (the day it falls on in the app's timezone), the start of the month for a month picker, and null when the
-     * value isn't a date.
+     * date, the start of the month for a month picker, and null when the value isn't a date.
+     *
+     * The day of a date object is the one it shows in its own timezone, so `today('Asia/Hebron')` is that day in Hebron
+     * and not the one before in UTC. The day of text with an offset, such as a model's date as JSON
+     * ("2024-01-14T21:00:00.000000Z"), is the one it falls on in the app's timezone.
      */
     public function parseValue(mixed $value): ?CarbonInterface
     {
         $date = match (true) {
             $value instanceof DateTimeInterface => Carbon::instance($value),
-            is_string($value) && filled($value), is_int($value) => $this->parseText((string) $value),
+            is_string($value) && filled($value), is_int($value) => $this->parseText((string) $value)?->setTimezone(config('app.timezone')),
             default => null,
         };
 
@@ -389,13 +392,15 @@ abstract class BasePicker extends Field
         }
 
         $date = $date->avoidMutation();
+        $kind = $this->getKind();
 
-        return match ($this->getKind()) {
-            PickerKind::DateTime => $date->setTimezone($this->getTimezone()),
-            PickerKind::Time => $date,
-            PickerKind::Month => $date->setTimezone(config('app.timezone'))->startOfMonth(),
-            default => $date->setTimezone(config('app.timezone'))->startOfDay(),
-        };
+        if (in_array($kind, [PickerKind::DateTime, PickerKind::Time], true)) {
+            return ($kind === PickerKind::DateTime) ? $date->setTimezone($this->getTimezone()) : $date;
+        }
+
+        $day = StrictDate::fromFormat('Y-m-d', $date->format('Y-m-d'), config('app.timezone'));
+
+        return ($kind === PickerKind::Month) ? $day?->startOfMonth() : $day;
     }
 
     protected function parseText(string $value): ?CarbonInterface

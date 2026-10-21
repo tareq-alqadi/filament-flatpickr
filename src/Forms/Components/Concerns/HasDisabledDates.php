@@ -6,6 +6,7 @@ use Carbon\CarbonInterface;
 use Closure;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
+use TareqAlqadi\FilamentFlatpickr\Enums\PickerKind;
 use TareqAlqadi\FilamentFlatpickr\Support\StrictDate;
 
 /**
@@ -121,13 +122,16 @@ trait HasDisabledDates
     }
 
     /**
-     * The day an entry names. A date object is the day it falls on in the state's timezone; text such as
-     * "2024-12-25" is that day wherever the picker is.
+     * The day an entry names. A date object is a moment for a date and time picker, so the day it falls on in the
+     * picker's timezone; otherwise it is the day it shows in its own timezone, so `today('Asia/Hebron')` is that day in
+     * Hebron. Text such as "2024-12-25" is that day wherever the picker is.
      */
     protected function resolveDay(mixed $date): ?string
     {
         if ($date instanceof DateTimeInterface) {
-            return Carbon::instance($date)->setTimezone($this->getStateTimezone())->format('Y-m-d');
+            return ($this->getKind() === PickerKind::DateTime)
+                ? Carbon::instance($date)->setTimezone($this->getTimezone())->format('Y-m-d')
+                : $date->format('Y-m-d');
         }
 
         if (! is_string($date) || blank($date)) {

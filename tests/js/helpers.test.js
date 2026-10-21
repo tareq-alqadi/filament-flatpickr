@@ -3,7 +3,7 @@ import arabic from '../../resources/dist/locales/ar.json';
 import french from '../../resources/dist/locales/fr.json';
 import { resolveLocale } from '../../resources/js/utils/locale.js';
 import { resolvePresetDate } from '../../resources/js/plugins/presets.js';
-import { startOfWeek } from '../../resources/js/utils/dates.js';
+import { nowIn, startOfWeek } from '../../resources/js/utils/dates.js';
 import { datesFromState, isList } from '../../resources/js/utils/state.js';
 import { createStrictDateParser } from '../../resources/js/utils/strict-parser.js';
 import { local } from './mount.js';
@@ -126,4 +126,30 @@ describe('resolvePresetDate', () => {
     expect(resolvePresetDate('not a date', fp)).toBeNull();
     expect(resolvePresetDate('', fp)).toBeNull();
   });
+});
+
+describe('nowIn', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads the clock of a timezone as a local date', () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 9, 21, 6, 34, 31), toFake: ['Date'] });
+
+    expect(local(nowIn('Asia/Hebron'))).toBe('2026-10-21 09:34:31');
+    expect(local(nowIn('UTC'))).toBe('2026-10-21 06:34:31');
+    expect(local(nowIn('America/New_York'))).toBe('2026-10-21 02:34:31');
+  });
+
+  it("is the user's clock without a timezone, or for one the browser does not know", () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 9, 21, 6, 34, 31), toFake: ['Date'] });
+
+    expect(nowIn(null).getTime()).toBe(Date.now());
+    expect(nowIn('Nowhere/Atlantis').getTime()).toBe(Date.now());
+  });
+});
+
+it('resolves preset tokens from the day now is on', () => {
+  expect(local(resolvePresetDate('today', null, new Date(2024, 0, 31, 23, 0)))).toBe('2024-01-31 00:00:00');
+  expect(local(resolvePresetDate('tomorrow', null, new Date(2024, 0, 31, 23, 0)))).toBe('2024-02-01 00:00:00');
 });

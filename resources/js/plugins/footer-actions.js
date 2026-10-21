@@ -2,22 +2,22 @@ import { ensureCalendarMainWrapper } from '../utils/calendar-layout.js';
 import { startOfDay, startOfMonth } from '../utils/dates.js';
 
 /**
- * Clear, Today and Apply buttons under the calendar, for the labels given.
+ * Clear, Today and Apply buttons under the calendar, for the labels given. `now` gives the moment Today picks.
  */
-export function footerActionsPlugin({ today, clear, apply }, kind) {
+export function footerActionsPlugin({ today, clear, apply }, kind, now = () => new Date()) {
   return (fp) => {
     let todayButton = null;
 
     // A picker with a time gets now, a month picker this month, and others the start of today: flatpickr compares
     // "now" with a disabled day to the second, so it would let today through.
     const todayDate = () => {
-      const now = new Date();
+      const date = now();
 
       if (fp.config.enableTime) {
-        return now;
+        return date;
       }
 
-      return kind === 'month' ? startOfMonth(now) : startOfDay(now);
+      return kind === 'month' ? startOfMonth(date) : startOfDay(date);
     };
 
     // Today can't be picked before minDate, after maxDate or on a disabled day. It is checked whenever the calendar

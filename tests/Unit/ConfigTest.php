@@ -83,6 +83,21 @@ it('sends min and max dates of a date and time picker as moments in its timezone
     expect($config['minDate'])->toBe('2024-01-10 13:00:00');
 });
 
+it('sends date objects as the day they show in their own timezone', function () {
+    // 01:30 on 21 October in Hebron, still the 20th in UTC.
+    freezeAt('2026-10-20 22:30:00');
+
+    $config = DatePicker::make('date')
+        ->minDate(Carbon::today('Asia/Hebron'))
+        ->disabledDates([Carbon::today('Asia/Hebron')->addDay()])
+        ->getConfig();
+
+    expect($config['minDate'])->toBe('2026-10-21')
+        ->and($config['disable'])->toBe(['2026-10-22'])
+        ->and(DatePicker::make('date')->presets([['label' => 'Today', 'date' => Carbon::today('Asia/Hebron')]])->getPresets()[0]['date'])->toBe('2026-10-21')
+        ->and(MonthPicker::make('date')->minDate(Carbon::parse('2026-11-01', 'Asia/Hebron'))->getConfig()['minDate'])->toBe('2026-11-01');
+});
+
 it('sends the min date of a month picker as its month', function () {
     expect(MonthPicker::make('date')->minDate('2024-01-15')->getConfig()['minDate'])->toBe('2024-01-01');
 });
