@@ -98,6 +98,12 @@ it('sends date objects as the day they show in their own timezone', function () 
         ->and(MonthPicker::make('date')->minDate(Carbon::parse('2026-11-01', 'Asia/Hebron'))->getConfig()['minDate'])->toBe('2026-11-01');
 });
 
+it('sends limits as precise as the server checks them', function () {
+    expect(TimePicker::make('date')->seconds()->minTime('09:00:30')->getConfig()['minTime'])->toBe('09:00:30')
+        ->and(DateTimePicker::make('date')->minDate(Carbon::parse('2026-10-21 10:00:00.500000'))->getConfig()['minDate'])->toBe('2026-10-21 10:00:01')
+        ->and(DateTimePicker::make('date')->maxDate(Carbon::parse('2026-10-21 10:00:00.500000'))->getConfig()['maxDate'])->toBe('2026-10-21 10:00:00');
+});
+
 it('sends the min date of a month picker as its month', function () {
     expect(MonthPicker::make('date')->minDate('2024-01-15')->getConfig()['minDate'])->toBe('2024-01-01');
 });
@@ -121,7 +127,7 @@ it('sends disabled and enabled days', function () {
 it('sends time limits and steps', function () {
     $config = TimePicker::make('date')->minTime('09:00')->maxTime('17:30:00')->hoursStep(2)->minutesStep(15)->getConfig();
 
-    expect($config)->toMatchArray(['minTime' => '09:00', 'maxTime' => '17:30', 'hourIncrement' => 2, 'minuteIncrement' => 15])
+    expect($config)->toMatchArray(['minTime' => '09:00:00', 'maxTime' => '17:30:00', 'hourIncrement' => 2, 'minuteIncrement' => 15])
         ->and(TimePicker::make('date')->getConfig())->not->toHaveKeys(['minTime', 'hourIncrement']);
 });
 

@@ -34,16 +34,19 @@ trait HasDateLimits
 
     /**
      * The minimum as the picker reads it: a moment for a date and time picker, otherwise the start of its day, or of
-     * its month for a month picker.
+     * its month for a month picker. The browser gets moments to the second, so a part of a second rounds the minimum
+     * up and the maximum down: 10:00:00.5 is a minimum of 10:00:01, which the browser can pick.
      */
     public function getMinDate(): ?CarbonInterface
     {
-        return $this->parseValue($this->evaluate($this->minDate));
+        $date = $this->parseValue($this->evaluate($this->minDate));
+
+        return ($date && $date->micro) ? $date->avoidMutation()->startOfSecond()->addSecond() : $date;
     }
 
     public function getMaxDate(): ?CarbonInterface
     {
-        return $this->parseValue($this->evaluate($this->maxDate));
+        return $this->parseValue($this->evaluate($this->maxDate))?->avoidMutation()->startOfSecond();
     }
 
     /**

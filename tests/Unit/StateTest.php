@@ -147,6 +147,19 @@ it('does not read a time the clocks skip in the picker timezone', function () {
         ->and($picker->parsePicked('2026-11-01 01:30:00'))->not->toBeNull();
 });
 
+it('keeps the second time of the hour the clocks go back over', function () {
+    // 01:30 on 1 November 2026 happens twice in New York: at 05:30 UTC, then at 06:30 UTC.
+    $picker = DateTimePicker::make('date')->timezone('America/New_York');
+
+    expect($picker->toState('2026-11-01 05:30:00'))->toBe('2026-11-01 01:30:00')
+        ->and($picker->toState('2026-11-01 06:30:00'))->toBe('2026-11-01 01:30:00-05:00')
+        ->and($picker->fromState('2026-11-01 01:30:00'))->toBe('2026-11-01 05:30:00')
+        ->and($picker->fromState('2026-11-01 01:30:00-05:00'))->toBe('2026-11-01 06:30:00')
+        ->and($picker->parsePicked('2026-11-01 01:30:00-05:00')[0]->format('H:i T'))->toBe('01:30 EST')
+        ->and($picker->parsePicked('2026-11-01 01:30:00+02:00'))->toBeNull()
+        ->and(DatePicker::make('date')->parsePicked('2026-11-01-05:00'))->toBeNull();
+});
+
 it('reads a day whose midnight the clocks skip', function () {
     // Beirut moves to summer time at midnight on 29 March 2026.
     appTimezone('Asia/Beirut');

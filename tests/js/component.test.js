@@ -50,6 +50,14 @@ describe('state', () => {
     expect(component.fp.altInput.value).toBe('');
   });
 
+  it('shows the second time of an hour the clocks go back over, and keeps its offset', async () => {
+    const component = mount({ kind: 'datetime', state: '2026-11-01 01:30:00-05:00' });
+
+    expect(local(component.fp.selectedDates[0])).toBe('2026-11-01 01:30:00');
+    await settle();
+    expect(component.state).toBe('2026-11-01 01:30:00-05:00');
+  });
+
   it('writes a picked date in the state format whatever the locale', () => {
     const component = mount({ locale: arabic, config: { altFormat: 'j F Y' } });
 
@@ -270,6 +278,42 @@ describe('Today', () => {
     }
   });
 
+  it('can not pick now outside minTime and maxTime', async () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 21, 18, 0), toFake: ['Date'] });
+
+    try {
+      const footerActions = { today: 'Today' };
+      const closed = mount({ kind: 'time', config: { minTime: '09:00', maxTime: '17:00' }, footerActions });
+
+      expect(todayButton(closed).disabled).toBe(true);
+
+      todayButton(closed).click();
+      await settle();
+
+      expect(closed.state).toBeNull();
+      expect(todayButton(mount({ kind: 'time', config: { minTime: '09:00', maxTime: '18:00' }, footerActions })).disabled).toBe(false);
+      // Over midnight.
+      expect(todayButton(mount({ kind: 'time', config: { minTime: '17:00', maxTime: '06:00' }, footerActions })).disabled).toBe(false);
+      expect(todayButton(mount({ kind: 'time', config: { minTime: '19:00', maxTime: '06:00' }, footerActions })).disabled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('can not pick now before the time of minDate or after the time of maxDate', () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 21, 14, 0), toFake: ['Date'] });
+
+    try {
+      const footerActions = { today: 'Today' };
+
+      expect(todayButton(mount({ kind: 'datetime', config: { maxDate: '2026-10-21 12:00:00' }, footerActions })).disabled).toBe(true);
+      expect(todayButton(mount({ kind: 'datetime', config: { minDate: '2026-10-21 15:00:00' }, footerActions })).disabled).toBe(true);
+      expect(todayButton(mount({ kind: 'datetime', config: { maxDate: '2026-10-21 15:00:00' }, footerActions })).disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('can not pick today before minDate or after maxDate', () => {
     const footerActions = { today: 'Today' };
 
@@ -383,6 +427,29 @@ describe('calendar', () => {
 });
 
 describe('field', () => {
+  it('gives the input the user sees the id and aria attributes, so the label names it', () => {
+    const component = mount({ attributes: { id: 'form.date', 'aria-describedby': 'form.date-hint', autofocus: '' } });
+    const { input, altInput } = component.fp;
+
+    expect(altInput.id).toBe('form.date');
+    expect(altInput.getAttribute('aria-describedby')).toBe('form.date-hint');
+    expect(altInput.hasAttribute('autofocus')).toBe(true);
+    expect(input.hasAttribute('id')).toBe(false);
+    expect(input.hasAttribute('aria-describedby')).toBe(false);
+
+    component.destroy();
+
+    expect(input.id).toBe('form.date');
+    expect(input.getAttribute('aria-describedby')).toBe('form.date-hint');
+  });
+
+  it('gives flatpickr time limits with their seconds', () => {
+    const { fp } = mount({ kind: 'time', config: { minTime: '09:00:30', maxTime: '17:00' } });
+
+    expect([fp.config.minTime.getHours(), fp.config.minTime.getMinutes(), fp.config.minTime.getSeconds()]).toEqual([9, 0, 30]);
+    expect([fp.config.maxTime.getHours(), fp.config.maxTime.getMinutes()]).toEqual([17, 0]);
+  });
+
   it('empties the state when its text is deleted', () => {
     const component = mount({ state: '2024-01-15', config: { allowInput: true } });
 

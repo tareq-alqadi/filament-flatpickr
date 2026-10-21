@@ -430,6 +430,24 @@ abstract class BasePicker extends Field
     }
 
     /**
+     * A value given in code or stored as the browser holds it. In the hour the clocks go back over, such as 01:30 on
+     * 1 November 2026 in New York, a time happens twice and the state format reads as the first: the second is
+     * followed by its offset, as "2026-11-01 01:30:00-05:00", so it saves as the same moment.
+     */
+    protected function formatStoredState(CarbonInterface $date): string
+    {
+        $state = $this->formatState($date);
+
+        if ($this->getKind() !== PickerKind::DateTime) {
+            return $state;
+        }
+
+        $read = StrictDate::fromFormat($this->getKind()->stateFormat(), $state, $this->getTimezone());
+
+        return ($read?->getTimestamp() === $date->getTimestamp()) ? $state : $state.$date->format('P');
+    }
+
+    /**
      * A date as the field shows it, such as in a validation message.
      */
     public function formatForDisplay(CarbonInterface $date): string
@@ -453,7 +471,7 @@ abstract class BasePicker extends Field
             $dates = collect(Arr::wrap($value))
                 ->map(fn (mixed $entry): ?CarbonInterface => $this->parseValue($entry))
                 ->filter()
-                ->map(fn (CarbonInterface $date): string => $this->formatState($date))
+                ->map(fn (CarbonInterface $date): string => $this->formatStoredState($date))
                 ->values()
                 ->all();
 
@@ -462,7 +480,7 @@ abstract class BasePicker extends Field
 
         $date = $this->parseValue(is_array($value) ? Arr::first($value) : $value);
 
-        return $date ? $this->formatState($date) : null;
+        return $date ? $this->formatStoredState($date) : null;
     }
 
     /**
@@ -521,9 +539,7 @@ abstract class BasePicker extends Field
         $dates = [];
 
         foreach ($values as $value) {
-            $date = is_string($value)
-                ? StrictDate::fromFormat($kind->stateFormat(), $value, $this->getStateTimezone())
-                : null;
+            $date = is_string($value) ? $this->parseStateText($value) : null;
 
             if (! $date) {
                 return null;
@@ -533,6 +549,25 @@ abstract class BasePicker extends Field
         }
 
         return $dates;
+    }
+
+    /**
+     * Text in the state format, in the state's timezone. A date and time picker also reads it followed by an offset
+     * (see formatStoredState()), which must be one the timezone has at that time.
+     */
+    protected function parseStateText(string $value): ?CarbonInterface
+    {
+        $kind = $this->getKind();
+        $timezone = $this->getStateTimezone();
+        $date = StrictDate::fromFormat($kind->stateFormat(), $value, $timezone);
+
+        if ($date || ($kind !== PickerKind::DateTime)) {
+            return $date;
+        }
+
+        $date = StrictDate::fromFormat($kind->stateFormat().'P', $value, $timezone)?->setTimezone($timezone);
+
+        return ($date && str_starts_with($value, $date->format($kind->stateFormat()))) ? $date : null;
     }
 
     /**

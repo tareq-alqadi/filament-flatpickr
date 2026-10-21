@@ -3,6 +3,7 @@ import WeekSelect from 'flatpickr/dist/esm/plugins/weekSelect/weekSelect';
 import { browserHintsPlugin } from '../plugins/browser-hints.js';
 import { followFieldPlugin } from '../plugins/follow-field.js';
 import { footerActionsPlugin } from '../plugins/footer-actions.js';
+import { labelledFieldPlugin } from '../plugins/labelled-field.js';
 import { presetsPlugin } from '../plugins/presets.js';
 import { textDeletedPlugin } from '../plugins/text-deleted.js';
 import { nowIn } from './dates.js';
@@ -34,6 +35,7 @@ export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, timezo
   }
 
   plugins.push(
+    labelledFieldPlugin(),
     browserHintsPlugin({ allowTyping: options.allowInput === true && !component.$refs.input.hasAttribute('readonly') }),
     textDeletedPlugin(() => {
       component.state = null;

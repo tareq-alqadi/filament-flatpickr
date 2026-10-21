@@ -20,9 +20,11 @@ const mounted = [];
  * state that fires after it changes, in a microtask as Alpine's does. Await `settle()` before checking what a watcher
  * did.
  */
-export function mount({ kind = 'date', config = {}, state = null, ...options } = {}) {
+export function mount({ kind = 'date', config = {}, state = null, attributes = {}, ...options } = {}) {
   const input = document.createElement('input');
   const inlineCalendar = document.createElement('div');
+
+  Object.entries(attributes).forEach(([name, value]) => input.setAttribute(name, value));
 
   document.body.append(input, inlineCalendar);
 

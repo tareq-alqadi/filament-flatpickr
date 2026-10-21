@@ -86,9 +86,9 @@ trait HasTimeOptions
             'enableSeconds' => $this->hasSeconds(),
             'hourIncrement' => $this->evaluate($this->hoursStep),
             'minuteIncrement' => $this->evaluate($this->minutesStep),
-            // Flatpickr reads these as "H:i".
-            'minTime' => $this->getMinTime()?->format('H:i'),
-            'maxTime' => $this->getMaxTime()?->format('H:i'),
+            // With seconds, as the server checks them.
+            'minTime' => $this->getMinTime()?->format('H:i:s'),
+            'maxTime' => $this->getMaxTime()?->format('H:i:s'),
         ], fn (mixed $value): bool => $value !== null);
     }
 

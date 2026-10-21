@@ -81,6 +81,10 @@ A browser can only work with times its own clock has. On the night the user's cl
 the skipped hour can't be picked, and a saved one is shown as it is stored, such as `2026-03-08 02:30:00`, instead of
 in the display format. The server rejects a time the picker's own timezone skips.
 
+On the night the clocks go back, a time such as 01:30 happens twice. A saved value that is the second one keeps its
+offset in the field's state (`"2026-11-01 01:30:00-05:00"`), so it saves as the same moment. A time picked in the
+browser is the first one.
+
 ### Limits
 
 Every picker with a calendar takes:
@@ -91,6 +95,10 @@ DatePicker::make('date')
     ->maxDate(now()->addMonth())
     ->minDate(fn (Get $get) => $get('starts_on'));
 ```
+
+Limits are worked out again when the form is submitted. On a `DateTimePicker`, `->minDate('now')` therefore moves on
+while the user fills the form, and a time picked as "now" is in the past by then. A part of a second in a limit
+rounds to the second the browser can pick.
 
 `DatePicker`, `DateTimePicker`, `DateRangePicker` and `MultiDatePicker` also take days that can't be picked:
 

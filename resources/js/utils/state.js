@@ -35,15 +35,19 @@ export function stateFromDates(dates, fp, kind) {
 
 /**
  * The dates the calendar selects for a state: none for an empty one, or null when an entry isn't a date in the state
- * format. A week selects its anchor.
+ * format. A week selects its anchor. The offset the server adds to the second time of an hour the clocks go back over,
+ * such as "2026-11-01 01:30:00-05:00", is left out: the calendar shows the time, and the state keeps the offset until
+ * another date is picked.
  */
 export function datesFromState(state, fp, kind) {
   if (state === null || state === undefined || state === '' || (Array.isArray(state) && !state.length)) {
     return [];
   }
 
+  const withoutOffset = (value) => (kind === 'datetime' ? value.replace(/[+-]\d{2}:\d{2}$/, '') : value);
+
   const dates = (Array.isArray(state) ? state : [state])
-    .map((value) => (typeof value === 'string' ? fp.parseDate(value, fp.config.dateFormat) : undefined));
+    .map((value) => (typeof value === 'string' ? fp.parseDate(withoutOffset(value), fp.config.dateFormat) : undefined));
 
   if (!dates.every(isDate)) {
     return null;
