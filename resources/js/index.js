@@ -44,7 +44,7 @@ export default function filamentFlatpickr({
     },
 
     /**
-     * Shows a state the server set. Text that isn't in the state format empties the calendar.
+     * Shows a state the server set. Text the calendar can't read leaves it empty, and is shown as it is.
      */
     showState(value) {
       if (!this.fp) {
@@ -61,8 +61,18 @@ export default function filamentFlatpickr({
 
       if (dates?.length) {
         this.fp.setDate(dates, false);
-      } else {
-        this.fp.clear(false);
+
+        return;
+      }
+
+      this.fp.clear(false);
+
+      // An empty field would hide a value that is still saved. A time the user's clocks skip, such as 02:30 on the
+      // night they move to summer time, can't be a date in the browser when the picker's timezone doesn't skip it.
+      const text = [value ?? []].flat().join(', ');
+
+      if (text) {
+        (this.fp.altInput ?? this.fp.input).value = text;
       }
     },
 

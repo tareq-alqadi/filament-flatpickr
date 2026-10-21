@@ -77,6 +77,10 @@ or is a date that doesn't exist such as 31 February, empties the field instead o
 `->timezone('America/New_York')` sets the timezone a `DateTimePicker` shows. Its values are read and saved in
 `config('app.timezone')`. Days, months and weeks are the same in every timezone.
 
+A browser can only work with times its own clock has. On the night the user's clocks move to summer time, a time in
+the skipped hour can't be picked, and a saved one is shown as it is stored, such as `2026-03-08 02:30:00`, instead of
+in the display format. The server rejects a time the picker's own timezone skips.
+
 ### Limits
 
 Every picker with a calendar takes:

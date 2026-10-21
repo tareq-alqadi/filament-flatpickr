@@ -32,6 +32,24 @@ describe('state', () => {
     expect(component.fp.altInput.value).toBe('January 15, 2024');
   });
 
+  it('shows a state the calendar can not read as it is, instead of an empty field', async () => {
+    const component = mount({ kind: 'datetime', state: '2024-02-31 10:00:00' });
+
+    expect(component.fp.selectedDates).toHaveLength(0);
+    expect(component.fp.altInput.value).toBe('2024-02-31 10:00:00');
+    expect(component.state).toBe('2024-02-31 10:00:00');
+
+    component.state = '2024-01-15 10:00:00';
+    await settle();
+
+    expect(component.fp.altInput.value).toBe('January 15, 2024 10:00');
+
+    component.state = null;
+    await settle();
+
+    expect(component.fp.altInput.value).toBe('');
+  });
+
   it('writes a picked date in the state format whatever the locale', () => {
     const component = mount({ locale: arabic, config: { altFormat: 'j F Y' } });
 
