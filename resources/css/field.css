@@ -215,3 +215,42 @@
     background: color-mix(in oklab, #ffffff 8%, transparent);
     color: var(--gray-100, #f4f4f5);
 }
+
+/* On a narrow screen the presets cannot sit beside the calendar without pushing it past the edge: stack them above
+   it and let them wrap. A floating calendar takes the screen's width so the date grid stays whole; an inline or
+   static one stays within its field. */
+
+@media (max-width: 30rem) {
+    .flatpickr-calendar.fi-fp-has-presets.open,
+    .flatpickr-calendar.fi-fp-has-presets.inline {
+        flex-direction: column;
+    }
+
+    .flatpickr-calendar.fi-fp-has-presets.open:not(.static) {
+        width: calc(100vw - 1rem);
+        max-width: calc(100vw - 1rem);
+    }
+
+    .flatpickr-calendar.fi-fp-has-presets.inline,
+    .flatpickr-calendar.fi-fp-has-presets.static {
+        width: max-content;
+        max-width: 100%;
+    }
+
+    .flatpickr-calendar.fi-fp-has-presets .fi-fp-main {
+        align-items: center;
+    }
+
+    .flatpickr-calendar.fi-fp-has-presets .fi-fp-presets {
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        min-width: 0;
+        padding-inline-end: 0;
+        margin-inline-end: 0;
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-inline-end: 0;
+        border-bottom: 1px solid var(--gray-200, #e4e4e7);
+    }
+}
