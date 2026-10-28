@@ -424,6 +424,25 @@ describe('calendar', () => {
     expect(main.querySelector('.flatpickr-monthSelect-months')).not.toBeNull();
     expect(main.lastElementChild.classList.contains('fi-fp-footer')).toBe(true);
   });
+
+  it('marks the month the state holds, in its year, and the one the server sets later', async () => {
+    const component = mount({ kind: 'month', state: '2024-02-01' });
+    const months = () => [...component.fp.calendarContainer.querySelectorAll('.flatpickr-monthSelect-month')];
+    const selected = () => months().filter((month) => month.classList.contains('selected')).map((month) => ymd(month.dateObj));
+
+    expect(selected()).toEqual(['2024-02-01']);
+    expect(months().every((month) => month.dateObj.getFullYear() === 2024)).toBe(true);
+
+    component.state = '2025-07-01';
+    await settle();
+
+    expect(selected()).toEqual(['2025-07-01']);
+
+    component.state = null;
+    await settle();
+
+    expect(selected()).toEqual([]);
+  });
 });
 
 describe('field', () => {

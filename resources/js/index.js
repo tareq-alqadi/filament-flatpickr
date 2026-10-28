@@ -1,5 +1,6 @@
 import flatpickr from 'flatpickr';
 import { buildFlatpickrConfig } from './utils/build-config.js';
+import { showPickedMonth } from './utils/month-grid.js';
 import { datesFromState, stateFromDates } from './utils/state.js';
 
 /**
@@ -61,11 +62,13 @@ export default function filamentFlatpickr({
 
       if (dates?.length) {
         this.fp.setDate(dates, false);
+        this.showPickedMonth();
 
         return;
       }
 
       this.fp.clear(false);
+      this.showPickedMonth();
 
       // An empty field would hide a value that is still saved. A time the user's clocks skip, such as 02:30 on the
       // night they move to summer time, can't be a date in the browser when the picker's timezone doesn't skip it.
@@ -73,6 +76,12 @@ export default function filamentFlatpickr({
 
       if (text) {
         (this.fp.altInput ?? this.fp.input).value = text;
+      }
+    },
+
+    showPickedMonth() {
+      if (this.kind === 'month') {
+        showPickedMonth(this.fp);
       }
     },
 
