@@ -1,6 +1,7 @@
 import MonthSelect from 'flatpickr/dist/esm/plugins/monthSelect';
 import WeekSelect from 'flatpickr/dist/esm/plugins/weekSelect/weekSelect';
 import { browserHintsPlugin } from '../plugins/browser-hints.js';
+import { closeAnimationPlugin } from '../plugins/close-animation.js';
 import { followFieldPlugin } from '../plugins/follow-field.js';
 import { footerActionsPlugin } from '../plugins/footer-actions.js';
 import { labelledFieldPlugin } from '../plugins/labelled-field.js';
@@ -44,6 +45,10 @@ export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, calend
 
   if (!options.static && !options.inline) {
     plugins.push(followFieldPlugin());
+  }
+
+  if (!options.inline) {
+    plugins.push(closeAnimationPlugin());
   }
 
   if (component.presets?.length) {
