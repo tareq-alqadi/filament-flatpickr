@@ -1,1 +1,1 @@
-/resources/dist/locales/*.json text eol=lf
+/resources/dist/** text eol=lf
