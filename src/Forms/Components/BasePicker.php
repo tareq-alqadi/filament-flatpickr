@@ -48,6 +48,8 @@ abstract class BasePicker extends Field
 
     protected string|Closure|null $locale = null;
 
+    protected string|Closure|null $calendarDirection = 'ltr';
+
     protected bool|Closure $isInputAllowed = false;
 
     protected bool|Closure $isInline = false;
@@ -166,6 +168,24 @@ abstract class BasePicker extends Field
     public function getLocale(): string
     {
         return $this->evaluate($this->locale) ?? app()->getLocale();
+    }
+
+    /**
+     * Lays the calendar's grid of days out "ltr" or "rtl", or in the page's direction when null. Left to right by
+     * default, as most users read a calendar even on an RTL page. The rest of the calendar follows the page.
+     */
+    public function calendarDirection(string|Closure|null $direction): static
+    {
+        $this->calendarDirection = $direction;
+
+        return $this;
+    }
+
+    public function getCalendarDirection(): ?string
+    {
+        $direction = $this->evaluate($this->calendarDirection);
+
+        return in_array($direction, ['ltr', 'rtl'], true) ? $direction : null;
     }
 
     /**

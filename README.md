@@ -167,6 +167,14 @@ The calendar uses the app's locale, with every locale flatpickr ships; only the 
 locale such as `pt_BR` uses flatpickr's `pt`, and one flatpickr doesn't have falls back to English. `->locale('fr')`
 sets it for one field.
 
+The calendar follows the page's direction, but its grid of days is laid out left to right even on a right-to-left
+page, as most users read calendars. `->calendarDirection('rtl')` lays the grid out right to left,
+`->calendarDirection(null)` makes it follow the page, and `configureUsing()` sets it for every picker:
+
+```php
+BasePicker::configureUsing(fn (BasePicker $picker) => $picker->calendarDirection(null));
+```
+
 ### Phones
 
 Phones get the same calendar. `->nativeOnMobile()` gives them the browser's own date input instead, without presets,

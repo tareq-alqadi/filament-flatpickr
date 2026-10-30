@@ -386,6 +386,24 @@ describe('calendar', () => {
     expect(mount().fp.calendarContainer.classList.contains('fi-fp-calendar')).toBe(true);
   });
 
+  it("lays the calendar out in the page's direction and its days in the field's", () => {
+    expect(mount().fp.innerContainer.dir).toBe('ltr');
+
+    document.documentElement.dir = 'rtl';
+
+    try {
+      const { fp } = mount({ calendarDirection: 'ltr' });
+
+      expect(fp.calendarContainer.dir).toBe('rtl');
+      expect(fp.monthNav.dir).toBe('');
+      expect(fp.innerContainer.dir).toBe('ltr');
+      expect(mount().fp.innerContainer.dir).toBe('rtl');
+      expect(mount({ calendarDirection: 'ltr', config: { showMonths: 2 } }).fp.monthNav.dir).toBe('ltr');
+    } finally {
+      document.documentElement.removeAttribute('dir');
+    }
+  });
+
   it('draws an inline calendar under the field', () => {
     const component = mount({ config: { inline: true } });
 

@@ -14,6 +14,7 @@ export default function filamentFlatpickr({
   config = {},
   locale = null,
   firstDayOfWeek = null,
+  calendarDirection = null,
   timezone = null,
   presets = [],
   footerActions = {},
@@ -86,7 +87,7 @@ export default function filamentFlatpickr({
     },
 
     init() {
-      this.fp = flatpickr(this.$refs.input, buildFlatpickrConfig(this, { locale, firstDayOfWeek, timezone }));
+      this.fp = flatpickr(this.$refs.input, buildFlatpickrConfig(this, { locale, firstDayOfWeek, calendarDirection, timezone }));
 
       this.showState(this.state);
 

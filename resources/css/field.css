@@ -227,7 +227,7 @@
     }
 
     .flatpickr-calendar.fi-fp-has-presets.open:not(.static) {
-        width: calc(100vw - 1rem);
+        width: calc(100vw - 1rem) !important;
         max-width: calc(100vw - 1rem);
     }
 

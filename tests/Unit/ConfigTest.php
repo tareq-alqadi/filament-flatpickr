@@ -139,6 +139,13 @@ it('sends calendar options', function () {
         ->and(DatePicker::make('date')->firstDayOfWeek(7)->getFirstDayOfWeek())->toBe(0);
 });
 
+it('lays the calendar out left to right unless it is set to rtl or the page direction', function () {
+    expect(DatePicker::make('date')->getCalendarDirection())->toBe('ltr')
+        ->and(DatePicker::make('date')->calendarDirection(fn () => 'rtl')->getCalendarDirection())->toBe('rtl')
+        ->and(DatePicker::make('date')->calendarDirection(null)->getCalendarDirection())->toBeNull()
+        ->and(DatePicker::make('date')->calendarDirection('auto')->getCalendarDirection())->toBeNull();
+});
+
 it('shows a calendar icon, a clock for a time picker, and an icon the user set', function () {
     expect(DatePicker::make('date')->getPrefixIcon())->toBe('heroicon-o-calendar-days')
         ->and(TimePicker::make('date')->getPrefixIcon())->toBe('heroicon-o-clock')

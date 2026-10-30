@@ -25,6 +25,7 @@
         'config' => $getConfig(),
         'locale' => FlatpickrLocale::find($getLocale()),
         'firstDayOfWeek' => $getFirstDayOfWeek(),
+        'calendarDirection' => $getCalendarDirection(),
         'timezone' => $getStateTimezone(),
         'presets' => $getPresets(),
         'footerActions' => $getFooterActions(),

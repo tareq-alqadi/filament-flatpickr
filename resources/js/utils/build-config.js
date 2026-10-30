@@ -15,7 +15,7 @@ import { createStrictDateParser } from './strict-parser.js';
  * The options flatpickr is created with: the field's, which the server sends as JSON, the plugins for what the field
  * adds to the calendar, and the hook that writes the picked dates to the state.
  */
-export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, timezone }) {
+export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, calendarDirection, timezone }) {
   const { kind, config: options } = component;
   const l10n = resolveLocale(options.locale ?? locale, { firstDayOfWeek });
 
@@ -66,6 +66,21 @@ export function buildFlatpickrConfig(component, { locale, firstDayOfWeek, timezo
     appendTo: options.inline && !options.static ? component.$refs.inlineCalendar : undefined,
     onReady: (_selectedDates, _dateStr, fp) => {
       fp.calendarContainer.classList.add('fi-fp-calendar');
+      // The calendar reads like the field's page, as a floating calendar sits in the body, outside the field. Only its
+      // grid of days or months takes the field's direction, and with several months their names above it too, so each
+      // name stays over its month.
+      const pageDirection = component.$refs.input.closest('[dir]')?.dir === 'rtl' ? 'rtl' : 'ltr';
+      const gridDirection = calendarDirection ?? pageDirection;
+
+      fp.calendarContainer.dir = pageDirection;
+
+      if (fp.innerContainer) {
+        fp.innerContainer.dir = gridDirection;
+      }
+
+      if (fp.monthNav && fp.config.showMonths > 1) {
+        fp.monthNav.dir = gridDirection;
+      }
     },
     onChange: (selectedDates, _dateStr, fp) => {
       const state = stateFromDates(selectedDates, fp, kind);
