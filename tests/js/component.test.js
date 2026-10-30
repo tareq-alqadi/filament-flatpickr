@@ -386,6 +386,35 @@ describe('calendar', () => {
     expect(mount().fp.calendarContainer.classList.contains('fi-fp-calendar')).toBe(true);
   });
 
+  it('keeps the calendar shown while it animates out', () => {
+    const { fp } = mount();
+    const calendar = fp.calendarContainer;
+
+    fp.open();
+    fp.close();
+
+    expect(calendar.classList.contains('open')).toBe(true);
+    expect(calendar.classList.contains('fi-fp-closing')).toBe(true);
+
+    calendar.dispatchEvent(new Event('animationend'));
+
+    expect(calendar.classList.contains('open')).toBe(false);
+    expect(calendar.classList.contains('fi-fp-closing')).toBe(false);
+  });
+
+  it('takes a closing calendar straight back when it opens again', () => {
+    const { fp } = mount();
+    const calendar = fp.calendarContainer;
+
+    fp.open();
+    fp.close();
+    fp.open();
+    calendar.dispatchEvent(new Event('animationend'));
+
+    expect(calendar.classList.contains('open')).toBe(true);
+    expect(calendar.classList.contains('fi-fp-closing')).toBe(false);
+  });
+
   it("lays the calendar out in the page's direction and its days in the field's", () => {
     expect(mount().fp.innerContainer.dir).toBe('ltr');
 
